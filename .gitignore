@@ -1,0 +1,16 @@
+node_modules
+.pnpm-store
+.turbo
+.DS_Store
+
+# Next.js
+apps/web/.next
+apps/web/out
+apps/web/node_modules
+
+# NestJS
+apps/api/dist
+apps/api/node_modules
+
+# Logs
+npm-debug.log*
