@@ -7,6 +7,7 @@ import {
   Param,
   Post,
 } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 type SaleItemInput = {
@@ -112,45 +113,58 @@ export class SalesController {
       }
     }
 
-    const saleNo = await this.createSaleNo(soldAt);
     const totalAmount = normalizedItems.reduce(
       (sum, item) => sum + item.qty * item.unitPrice,
       0,
     );
 
     return this.prisma.$transaction(async (tx) => {
-      const sale = await tx.sale.create({
-        data: {
-          saleNo,
-          soldAt,
-          totalAmount,
-          note: body.note ?? null,
-          items: {
-            create: normalizedItems.map((item) => ({
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const saleNo = await this.createSaleNo(tx, soldAt);
+
+        try {
+          const sale = await tx.sale.create({
+            data: {
+              saleNo,
+              soldAt,
+              totalAmount,
+              note: body.note ?? null,
+              items: {
+                create: normalizedItems.map((item) => ({
+                  variantId: item.variantId,
+                  qty: item.qty,
+                  unitPrice: item.unitPrice,
+                  lineTotal: item.qty * item.unitPrice,
+                })),
+              },
+            },
+          });
+
+          await tx.stockMovement.createMany({
+            data: normalizedItems.map((item) => ({
               variantId: item.variantId,
-              qty: item.qty,
-              unitPrice: item.unitPrice,
-              lineTotal: item.qty * item.unitPrice,
+              saleId: sale.id,
+              type: 'OUT',
+              qty: -item.qty,
+              unitCost: null,
+              note: '销售出库',
             })),
-          },
-        },
-      });
+          });
 
-      await tx.stockMovement.createMany({
-        data: normalizedItems.map((item) => ({
-          variantId: item.variantId,
-          saleId: sale.id,
-          type: 'OUT',
-          qty: -item.qty,
-          unitCost: null,
-          note: '销售出库',
-        })),
-      });
+          return tx.sale.findUnique({
+            where: { id: sale.id },
+            include: { items: true },
+          });
+        } catch (error) {
+          if ((error as { code?: string })?.code === 'P2002') {
+            continue;
+          }
 
-      return tx.sale.findUnique({
-        where: { id: sale.id },
-        include: { items: true },
-      });
+          throw error;
+        }
+      }
+
+      throw new BadRequestException('销售单号生成失败，请重试');
     });
   }
 
@@ -177,23 +191,18 @@ export class SalesController {
     });
   }
 
-  private async createSaleNo(soldAt: Date) {
+  private async createSaleNo(tx: Prisma.TransactionClient, soldAt: Date) {
     const year = soldAt.getFullYear();
     const month = `${soldAt.getMonth() + 1}`.padStart(2, '0');
     const day = `${soldAt.getDate()}`.padStart(2, '0');
-    const start = new Date(year, soldAt.getMonth(), soldAt.getDate());
-    const end = new Date(year, soldAt.getMonth(), soldAt.getDate() + 1);
-
-    const count = await this.prisma.sale.count({
-      where: {
-        soldAt: {
-          gte: start,
-          lt: end,
-        },
-      },
+    const dateKey = `${year}${month}${day}`;
+    const counter = await tx.saleCounter.upsert({
+      where: { date: dateKey },
+      update: { seq: { increment: 1 } },
+      create: { date: dateKey, seq: 1 },
     });
 
-    const seq = `${count + 1}`.padStart(4, '0');
+    const seq = `${counter.seq}`.padStart(4, '0');
     return `S${year}${month}${day}-${seq}`;
   }
 }

@@ -11,6 +11,7 @@ import { UploadsModule } from './uploads/uploads.module';
 import { StockModule } from './stock/stock.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { SalesModule } from './sales/sales.module';
+import { ReturnsModule } from './returns/returns.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -31,6 +32,7 @@ import { AppService } from './app.service';
     UploadsModule,
     StockModule,
     SalesModule,
+    ReturnsModule,
   ],
   controllers: [AppController],
   providers: [
