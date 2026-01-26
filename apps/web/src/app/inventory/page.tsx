@@ -17,6 +17,7 @@ type ProductSummary = {
   id: string;
   name: string;
   baseCode: string;
+  imageUrl?: string | null;
   totalQty: number;
   totalCost: number;
   variants: VariantSummary[];
@@ -53,13 +54,32 @@ export default function InventorySummaryPage() {
                 className="rounded-3xl border border-[#eadfce] bg-[#fbf7f0] px-6 py-4"
               >
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-4">
-                  <div>
-                    <p className="text-lg font-semibold text-[#1f1811]">
-                      {product.name}
-                    </p>
-                    <p className="text-xs text-[#6b645a]">
-                      编码 {product.baseCode}
-                    </p>
+                  <div className="flex items-center gap-4">
+                    {product.imageUrl ? (
+                      <img
+                        src={product.imageUrl}
+                        alt={product.name}
+                        className="h-14 w-14 rounded-2xl object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#eadfce] text-xs text-[#6b645a]">
+                        暂无图片
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-lg font-semibold text-[#1f1811]">
+                        {product.name}
+                      </p>
+                      <p className="text-xs text-[#6b645a]">
+                        编码 {product.baseCode}
+                      </p>
+                      <a
+                        href={`/products/${product.id}`}
+                        className="text-xs text-[#a7652d]"
+                      >
+                        查看详情
+                      </a>
+                    </div>
                   </div>
                   <div className="flex gap-6 text-sm text-[#6b645a]">
                     <span>总数量 {product.totalQty}</span>

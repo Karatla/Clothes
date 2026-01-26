@@ -439,12 +439,34 @@ export default function ProductEntryPage() {
             <h2 className="text-lg font-semibold text-[#1f1811]">近期录入</h2>
             <div className="space-y-3 text-sm text-[#6b645a]">
               {products.map((product) => (
-                <div key={product.id} className="rounded-2xl border border-[#eadfce] bg-[#fbf7f0] p-3">
-                  <div className="font-semibold text-[#1f1811]">
-                    {product.name}
-                  </div>
-                  <div className="text-xs text-[#6b645a]">
-                    编码 {product.baseCode} · {product.variants.length} 个尺码
+                <div
+                  key={product.id}
+                  className="flex items-center gap-3 rounded-2xl border border-[#eadfce] bg-[#fbf7f0] p-3"
+                >
+                  {product.imageUrl ? (
+                    <img
+                      src={product.imageUrl}
+                      alt={product.name}
+                      className="h-12 w-12 rounded-2xl object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#eadfce] text-xs text-[#6b645a]">
+                      暂无图片
+                    </div>
+                  )}
+                  <div>
+                    <div className="font-semibold text-[#1f1811]">
+                      {product.name}
+                    </div>
+                    <div className="text-xs text-[#6b645a]">
+                      编码 {product.baseCode} · {product.variants.length} 个尺码
+                    </div>
+                    <a
+                      href={`/products/${product.id}`}
+                      className="text-xs text-[#a7652d]"
+                    >
+                      查看详情
+                    </a>
                   </div>
                 </div>
               ))}

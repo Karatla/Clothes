@@ -1,6 +1,81 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import {
+  Bar,
+  BarChart,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import AppHeader from "./components/app-header";
+import { apiFetch } from "@/lib/api";
 
 export default function Home() {
+  const [range, setRange] = useState<"7" | "30" | "custom">("30");
+  const [start, setStart] = useState<string>("");
+  const [end, setEnd] = useState<string>("");
+  const [daily, setDaily] = useState<Array<{ date: string; revenue: number; refunds: number }>>([]);
+  const [topProducts, setTopProducts] = useState<Array<{ name: string; baseCode: string; revenue: number }>>([]);
+  const [lowStock, setLowStock] = useState<Array<{ name: string; baseCode: string; totalQty: number }>>([]);
+
+  useEffect(() => {
+    const now = new Date();
+    const endDate = new Date(now.getTime());
+    const startDate = new Date(now.getTime());
+    if (range === "7") {
+      startDate.setDate(endDate.getDate() - 6);
+    } else {
+      startDate.setDate(endDate.getDate() - 29);
+    }
+
+    if (range !== "custom") {
+      setStart(startDate.toISOString().slice(0, 10));
+      setEnd(endDate.toISOString().slice(0, 10));
+    }
+  }, [range]);
+
+  useEffect(() => {
+    if (!start || !end) return;
+    Promise.all([
+      apiFetch<Array<{ date: string; revenue: number; refunds: number }>>(
+        `/reports/daily?start=${start}&end=${end}`,
+      ),
+      apiFetch<Array<{ name: string; baseCode: string; revenue: number }>>(
+        `/reports/top-products?start=${start}&end=${end}&limit=10`,
+      ),
+      apiFetch<{ products: Array<{ name: string; baseCode: string; totalQty: number }> }>(
+        "/stock/summary",
+      ),
+    ])
+      .then(([dailyData, topData, summary]) => {
+        setDaily(dailyData);
+        setTopProducts(topData);
+        const low = summary.products
+          .map((product) => ({
+            name: product.name,
+            baseCode: product.baseCode,
+            totalQty: product.totalQty,
+          }))
+          .filter((item) => item.totalQty < 5)
+          .sort((a, b) => a.totalQty - b.totalQty)
+          .slice(0, 10);
+        setLowStock(low);
+      })
+      .catch(() => null);
+  }, [start, end]);
+
+  const revenueSeries = useMemo(
+    () => daily.map((item) => ({
+      ...item,
+      net: item.revenue - item.refunds,
+    })),
+    [daily],
+  );
+
   return (
     <div className="min-h-screen px-6 py-12">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
@@ -39,6 +114,92 @@ export default function Home() {
             <div className="mt-6 space-y-3 text-sm text-white/70">
               <div>下一阶段：商品基础信息 + 颜色尺码矩阵</div>
               <div>记得在 .env 中配置管理员账号</div>
+            </div>
+          </div>
+        </section>
+
+        <section className="grid gap-6 md:grid-cols-3">
+          <div className="rounded-3xl bg-white/90 p-6 shadow-[0_25px_90px_-60px_rgba(36,27,14,0.4)]">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-semibold text-[#1f1811]">销售趋势</h3>
+              <div className="flex gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setRange("7")}
+                  className={`rounded-full px-3 py-1 ${range === "7" ? "bg-[#1f1811] text-white" : "border border-[#eadfce] text-[#6b645a]"}`}
+                >
+                  7天
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRange("30")}
+                  className={`rounded-full px-3 py-1 ${range === "30" ? "bg-[#1f1811] text-white" : "border border-[#eadfce] text-[#6b645a]"}`}
+                >
+                  30天
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRange("custom")}
+                  className={`rounded-full px-3 py-1 ${range === "custom" ? "bg-[#1f1811] text-white" : "border border-[#eadfce] text-[#6b645a]"}`}
+                >
+                  自定义
+                </button>
+              </div>
+            </div>
+            {range === "custom" ? (
+              <div className="mt-3 flex gap-2 text-xs text-[#6b645a]">
+                <input
+                  type="date"
+                  value={start}
+                  onChange={(event) => setStart(event.target.value)}
+                  className="rounded-xl border border-[#eadfce] px-2 py-1"
+                />
+                <span>至</span>
+                <input
+                  type="date"
+                  value={end}
+                  onChange={(event) => setEnd(event.target.value)}
+                  className="rounded-xl border border-[#eadfce] px-2 py-1"
+                />
+              </div>
+            ) : null}
+            <div className="mt-4 h-40">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={revenueSeries}>
+                  <XAxis dataKey="date" hide />
+                  <YAxis hide />
+                  <Tooltip formatter={(value) => `¥${Number(value).toFixed(2)}`} />
+                  <Line type="monotone" dataKey="net" stroke="#a7652d" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="rounded-3xl bg-white/90 p-6 shadow-[0_25px_90px_-60px_rgba(36,27,14,0.4)]">
+            <h3 className="text-base font-semibold text-[#1f1811]">热销商品</h3>
+            <div className="mt-4 h-40">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={topProducts} layout="vertical">
+                  <XAxis type="number" hide />
+                  <YAxis dataKey="name" type="category" width={60} tick={{ fontSize: 10 }} />
+                  <Tooltip formatter={(value) => `¥${Number(value).toFixed(2)}`} />
+                  <Bar dataKey="revenue" fill="#1f1811" radius={[4, 4, 4, 4]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="rounded-3xl bg-white/90 p-6 shadow-[0_25px_90px_-60px_rgba(36,27,14,0.4)]">
+            <h3 className="text-base font-semibold text-[#1f1811]">库存预警</h3>
+            <div className="mt-4 h-40">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={lowStock} layout="vertical">
+                  <XAxis type="number" hide />
+                  <YAxis dataKey="name" type="category" width={60} tick={{ fontSize: 10 }} />
+                  <Tooltip />
+                  <Bar dataKey="totalQty" fill="#b14d2a" radius={[4, 4, 4, 4]} />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           </div>
         </section>

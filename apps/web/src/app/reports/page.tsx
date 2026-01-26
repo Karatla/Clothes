@@ -1,6 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import {
+  Bar,
+  BarChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import AppHeader from "@/app/components/app-header";
 import { apiFetch } from "@/lib/api";
 
@@ -26,6 +34,8 @@ type ReportResponse = {
   rows: ReportRow[];
 };
 
+type DailyRow = { date: string; revenue: number; refunds: number };
+
 const toLocalDate = (date: Date) =>
   new Date(date.getTime() - date.getTimezoneOffset() * 60000)
     .toISOString()
@@ -36,6 +46,7 @@ export default function ReportsPage() {
   const [start, setStart] = useState(toLocalDate(new Date(new Date().getFullYear(), new Date().getMonth(), 1)));
   const [end, setEnd] = useState(toLocalDate(new Date()));
   const [report, setReport] = useState<ReportResponse | null>(null);
+  const [daily, setDaily] = useState<DailyRow[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const loadReport = async () => {
@@ -47,8 +58,21 @@ export default function ReportsPage() {
   };
 
   useEffect(() => {
-    loadReport().catch((err) => setError(err.message));
+    Promise.all([
+      loadReport(),
+      apiFetch<DailyRow[]>(`/reports/daily?start=${start}&end=${end}`),
+    ])
+      .then(([, dailyData]) => setDaily(dailyData))
+      .catch((err) => setError(err.message));
   }, [groupBy, start, end]);
+
+  const profitChart = useMemo(() => {
+    if (!report) return [];
+    return report.rows.slice(0, 10).map((row) => ({
+      name: row.productName,
+      profit: row.profit,
+    }));
+  }, [report]);
 
   const csvContent = useMemo(() => {
     if (!report) return "";
@@ -207,6 +231,36 @@ export default function ReportsPage() {
                 <div>{(report.totals.margin * 100).toFixed(1)}%</div>
               </div>
             ) : null}
+          </div>
+        </section>
+
+        <section className="grid gap-6 md:grid-cols-2">
+          <div className="rounded-3xl bg-white/90 p-6 shadow-[0_25px_90px_-60px_rgba(36,27,14,0.4)]">
+            <h3 className="text-base font-semibold text-[#1f1811]">利润前十商品</h3>
+            <div className="mt-4 h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={profitChart} layout="vertical">
+                  <XAxis type="number" hide />
+                  <YAxis dataKey="name" type="category" width={60} tick={{ fontSize: 10 }} />
+                  <Tooltip formatter={(value) => `¥${Number(value).toFixed(2)}`} />
+                  <Bar dataKey="profit" fill="#1f1811" radius={[4, 4, 4, 4]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+          <div className="rounded-3xl bg-white/90 p-6 shadow-[0_25px_90px_-60px_rgba(36,27,14,0.4)]">
+            <h3 className="text-base font-semibold text-[#1f1811]">销售 vs 退货</h3>
+            <div className="mt-4 h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={daily}>
+                  <XAxis dataKey="date" hide />
+                  <YAxis hide />
+                  <Tooltip formatter={(value) => `¥${Number(value).toFixed(2)}`} />
+                  <Bar dataKey="revenue" fill="#a7652d" radius={[4, 4, 4, 4]} />
+                  <Bar dataKey="refunds" fill="#b14d2a" radius={[4, 4, 4, 4]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </section>
       </div>
