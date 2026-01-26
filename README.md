@@ -43,3 +43,7 @@ If you change the port later, update this section.
 ### Node Version
 Use Node 20.19.0 for best compatibility:
 - `nvm use`
+
+if mention : error TS2305: Module '"@prisma/client"' has no exported member 'StockMovementType'.
+2 import { PrismaClient, StockMovementType } from '@prisma/client';
+npx prisma generate
