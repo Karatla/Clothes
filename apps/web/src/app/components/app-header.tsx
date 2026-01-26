@@ -63,6 +63,12 @@ export default function AppHeader({ label, title, description }: Props) {
             退货记录
           </a>
           <a
+            href="/reports"
+            className="rounded-full border border-[#eadfce] bg-[#fbf7f0] px-3 py-1"
+          >
+            销售报表
+          </a>
+          <a
             href="/inventory/stock-in"
             className="rounded-full border border-[#eadfce] bg-[#fbf7f0] px-3 py-1"
           >
