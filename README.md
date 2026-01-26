@@ -58,12 +58,13 @@ npx prisma generate
 第一阶段搭建环境成功。
 
 
-第二阶段编译工程文件（有更新后执行第3——5布）
+第二阶段编译工程文件（有更新后执行第3——6布）
 1、把.env文件复制到apps\api   下面
 2、把.env,local文件复制到web里面
 3、进入到api文件夹，运行 npx prisma generate，成功后
 4、运行     npm run build     进行编译库 （必须在api目录里很重要）
 5、进入到 web目录 npm run build   进行编译库 （必须在web目录里很重要）
+6, 如果数据库更新了执行这一步：npx prisma migrate deploy
 
 
 初始化数据库文件：（删除该文件）   apps/api/prisma/dev.db
