@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import AppHeader from "@/app/components/app-header";
+import SizeManager from "@/app/components/size-manager";
 import { apiFetch } from "@/lib/api";
 import { makeId } from "@/lib/id";
 
@@ -43,6 +44,12 @@ type Product = {
   variants: Array<{ id: string; color: string; size: string }>;
 };
 
+type Size = {
+  id: string;
+  name: string;
+  isActive: boolean;
+};
+
 type ExchangeItem = {
   id: string;
   productId: string;
@@ -70,6 +77,8 @@ export default function ReturnsPage() {
   const [sales, setSales] = useState<Sale[]>([]);
   const [returns, setReturns] = useState<ReturnRecord[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [sizeOptions, setSizeOptions] = useState<Size[]>([]);
+  const [showSizeManager, setShowSizeManager] = useState(false);
   const [saleId, setSaleId] = useState<string | null>(null);
   const [returnedAt, setReturnedAt] = useState(toLocalDateTime(new Date()));
   const [note, setNote] = useState("");
@@ -84,11 +93,13 @@ export default function ReturnsPage() {
       apiFetch<Sale[]>("/sales"),
       apiFetch<ReturnRecord[]>("/returns"),
       apiFetch<Product[]>("/products"),
+      apiFetch<Size[]>("/sizes?active=true"),
     ])
-      .then(([salesData, returnData, productData]) => {
+      .then(([salesData, returnData, productData, sizeData]) => {
         setSales(salesData);
         setReturns(returnData);
         setProducts(productData);
+        setSizeOptions(sizeData);
         if (salesData.length > 0) {
           setSaleId(salesData[0].id);
         }
@@ -217,6 +228,13 @@ export default function ReturnsPage() {
 
   return (
     <div className="min-h-screen px-6 py-12">
+      <SizeManager
+        open={showSizeManager}
+        onClose={() => setShowSizeManager(false)}
+        onUpdated={() =>
+          apiFetch<Size[]>("/sizes?active=true").then(setSizeOptions)
+        }
+      />
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
         <AppHeader
           label="退换货"
@@ -301,7 +319,16 @@ export default function ReturnsPage() {
           </div>
 
           <div className="mt-8 space-y-4">
-            <p className="text-sm font-semibold text-[#1f1811]">换货明细（可选）</p>
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-[#1f1811]">换货明细（可选）</p>
+              <button
+                type="button"
+                onClick={() => setShowSizeManager(true)}
+                className="rounded-full border border-[#e4d7c5] px-3 py-1 text-xs text-[#6b645a]"
+              >
+                管理尺码
+              </button>
+            </div>
             {exchangeItems.map((item) => {
               const product = products.find((p) => p.id === item.productId);
               const colors = Array.from(
@@ -313,12 +340,20 @@ export default function ReturnsPage() {
                     .filter((v) => (item.color ? v.color === item.color : true))
                     .map((v) => v.size),
                 ),
-              );
+              ).sort((a, b) => {
+                const order = sizeOptions.map((size) => size.name);
+                const ai = order.indexOf(a);
+                const bi = order.indexOf(b);
+                if (ai === -1 && bi === -1) return a.localeCompare(b);
+                if (ai === -1) return 1;
+                if (bi === -1) return -1;
+                return ai - bi;
+              });
 
               return (
                 <div
                   key={item.id}
-                  className="grid gap-3 rounded-2xl border border-[#eadfce] bg-white px-4 py-3 md:grid-cols-5"
+                  className="grid gap-3 rounded-2xl border border-[#eadfce] bg-white px-4 py-3 md:grid-cols-6"
                 >
                   <select
                     value={item.productId}

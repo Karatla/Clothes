@@ -13,6 +13,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { SalesModule } from './sales/sales.module';
 import { ReturnsModule } from './returns/returns.module';
 import { ReportsModule } from './reports/reports.module';
+import { SizesModule } from './sizes/sizes.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -35,6 +36,7 @@ import { AppService } from './app.service';
     SalesModule,
     ReturnsModule,
     ReportsModule,
+    SizesModule,
   ],
   controllers: [AppController],
   providers: [

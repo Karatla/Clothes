@@ -3,12 +3,17 @@
 import { useEffect, useMemo, useState } from "react";
 import AppHeader from "@/app/components/app-header";
 import CategoryManager from "@/app/components/category-manager";
+import SizeManager from "@/app/components/size-manager";
 import { API_BASE, apiFetch, uploadFile } from "@/lib/api";
 import { makeId } from "@/lib/id";
 
-const SIZES = ["S", "M", "L", "XL", "2XL"] as const;
-
 type Category = {
+  id: string;
+  name: string;
+  isActive: boolean;
+};
+
+type Size = {
   id: string;
   name: string;
   isActive: boolean;
@@ -31,24 +36,29 @@ type Cell = {
 type ColorRow = {
   id: string;
   name: string;
-  cells: Record<(typeof SIZES)[number], Cell>;
+  cells: Record<string, Cell>;
 };
 
 const emptyCell = (): Cell => ({ qty: "", cost: "", price: "" });
 
-const createRow = (): ColorRow => ({
+const buildCells = (sizes: string[], existing?: Record<string, Cell>) =>
+  sizes.reduce((acc, size) => {
+    acc[size] = existing?.[size] ?? emptyCell();
+    return acc;
+  }, {} as Record<string, Cell>);
+
+const createRow = (sizes: string[]): ColorRow => ({
   id: makeId(),
   name: "",
-  cells: SIZES.reduce((acc, size) => {
-    acc[size] = emptyCell();
-    return acc;
-  }, {} as Record<(typeof SIZES)[number], Cell>),
+  cells: buildCells(sizes),
 });
 
 export default function ProductEntryPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<ProductPreview[]>([]);
   const [showManager, setShowManager] = useState(false);
+  const [showSizeManager, setShowSizeManager] = useState(false);
+  const [sizes, setSizes] = useState<Size[]>([]);
 
   const [name, setName] = useState("");
   const [baseCode, setBaseCode] = useState("");
@@ -56,9 +66,11 @@ export default function ProductEntryPage() {
   const [tags, setTags] = useState("");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [rows, setRows] = useState<ColorRow[]>([createRow()]);
+  const [rows, setRows] = useState<ColorRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  const sizeNames = sizes.map((size) => size.name);
 
   const loadCategories = async () => {
     const data = await apiFetch<Category[]>("/categories?active=true");
@@ -73,10 +85,31 @@ export default function ProductEntryPage() {
     setProducts(data);
   };
 
+  const loadSizes = async () => {
+    const data = await apiFetch<Size[]>("/sizes?active=true");
+    setSizes(data);
+  };
+
   useEffect(() => {
     loadCategories().catch(() => null);
     loadProducts().catch(() => null);
+    loadSizes().catch(() => null);
   }, []);
+
+  useEffect(() => {
+    if (sizeNames.length === 0) {
+      return;
+    }
+    setRows((prev) => {
+      if (prev.length === 0) {
+        return [createRow(sizeNames)];
+      }
+      return prev.map((row) => ({
+        ...row,
+        cells: buildCells(sizeNames, row.cells),
+      }));
+    });
+  }, [sizes]);
 
   const totals = useMemo(() => {
     let totalQty = 0;
@@ -85,7 +118,7 @@ export default function ProductEntryPage() {
     const rowTotals = rows.map((row) => {
       let rowQty = 0;
       let rowAmount = 0;
-      SIZES.forEach((size) => {
+      sizeNames.forEach((size) => {
         const cell = row.cells[size];
         const qty = Number(cell.qty) || 0;
         const price = Number(cell.price) || 0;
@@ -102,7 +135,7 @@ export default function ProductEntryPage() {
 
   const handleRowChange = (
     rowId: string,
-    size: (typeof SIZES)[number],
+    size: string,
     field: keyof Cell,
     value: string,
   ) => {
@@ -127,7 +160,8 @@ export default function ProductEntryPage() {
     );
   };
 
-  const handleAddRow = () => setRows((prev) => [...prev, createRow()]);
+  const handleAddRow = () =>
+    setRows((prev) => [...prev, createRow(sizeNames)]);
 
   const handleRemoveRow = (rowId: string) => {
     setRows((prev) => prev.filter((row) => row.id !== rowId));
@@ -162,7 +196,7 @@ export default function ProductEntryPage() {
 
     rows.forEach((row) => {
       if (!row.name.trim()) return;
-      SIZES.forEach((size) => {
+      sizeNames.forEach((size) => {
         const cell = row.cells[size];
         const qty = Number(cell.qty) || 0;
         const costPrice = Number(cell.cost) || 0;
@@ -218,7 +252,7 @@ export default function ProductEntryPage() {
     setBaseCode("");
     setTags("");
     setImageUrl(null);
-    setRows([createRow()]);
+    setRows([createRow(sizeNames)]);
     setSuccess("商品已保存");
     await loadProducts();
   };
@@ -229,6 +263,11 @@ export default function ProductEntryPage() {
         open={showManager}
         onClose={() => setShowManager(false)}
         onUpdated={loadCategories}
+      />
+      <SizeManager
+        open={showSizeManager}
+        onClose={() => setShowSizeManager(false)}
+        onUpdated={loadSizes}
       />
 
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
@@ -283,6 +322,16 @@ export default function ProductEntryPage() {
                 </div>
               </label>
               <label className="space-y-2 text-sm text-[#6b645a]">
+                尺码管理
+                <button
+                  type="button"
+                  onClick={() => setShowSizeManager(true)}
+                  className="w-full rounded-2xl border border-[#e4d7c5] px-4 py-3 text-sm text-[#6b645a]"
+                >
+                  管理尺码
+                </button>
+              </label>
+              <label className="space-y-2 text-sm text-[#6b645a]">
                 标签（逗号分隔）
                 <input
                   value={tags}
@@ -332,9 +381,14 @@ export default function ProductEntryPage() {
             </div>
 
             <div className="overflow-hidden rounded-3xl border border-[#eadfce]">
-              <div className="grid grid-cols-[160px_repeat(5,1fr)_140px] bg-[#f5efe6] text-sm font-semibold text-[#5c544b]">
+              <div
+                className="grid bg-[#f5efe6] text-sm font-semibold text-[#5c544b]"
+                style={{
+                  gridTemplateColumns: `160px repeat(${sizeNames.length}, minmax(0, 1fr)) 140px`,
+                }}
+              >
                 <div className="px-4 py-3">颜色</div>
-                {SIZES.map((size) => (
+                {sizeNames.map((size) => (
                   <div key={size} className="px-4 py-3 text-center">
                     {size}
                   </div>
@@ -344,7 +398,10 @@ export default function ProductEntryPage() {
               {rows.map((row, rowIndex) => (
                 <div
                   key={row.id}
-                  className="grid grid-cols-[160px_repeat(5,1fr)_140px] border-t border-[#eadfce] bg-white"
+                  className="grid border-t border-[#eadfce] bg-white"
+                  style={{
+                    gridTemplateColumns: `160px repeat(${sizeNames.length}, minmax(0, 1fr)) 140px`,
+                  }}
                 >
                   <div className="px-4 py-3">
                     <input
@@ -365,11 +422,11 @@ export default function ProductEntryPage() {
                       </button>
                     ) : null}
                   </div>
-                  {SIZES.map((size) => (
+                  {sizeNames.map((size) => (
                     <div key={`${row.id}-${size}`} className="px-3 py-3">
                       <div className="space-y-2">
                         <input
-                          value={row.cells[size].qty}
+                          value={row.cells[size]?.qty ?? ""}
                           onChange={(event) =>
                             handleRowChange(row.id, size, "qty", event.target.value)
                           }
@@ -377,7 +434,7 @@ export default function ProductEntryPage() {
                           placeholder="数量"
                         />
                         <input
-                          value={row.cells[size].cost}
+                          value={row.cells[size]?.cost ?? ""}
                           onChange={(event) =>
                             handleRowChange(row.id, size, "cost", event.target.value)
                           }
@@ -385,7 +442,7 @@ export default function ProductEntryPage() {
                           placeholder="成本"
                         />
                         <input
-                          value={row.cells[size].price}
+                          value={row.cells[size]?.price ?? ""}
                           onChange={(event) =>
                             handleRowChange(row.id, size, "price", event.target.value)
                           }

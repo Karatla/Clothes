@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import AppHeader from "@/app/components/app-header";
+import SizeManager from "@/app/components/size-manager";
 import { apiFetch } from "@/lib/api";
 import { makeId } from "@/lib/id";
 
@@ -17,6 +18,12 @@ type Product = {
   name: string;
   baseCode: string;
   variants: Variant[];
+};
+
+type Size = {
+  id: string;
+  name: string;
+  isActive: boolean;
 };
 
 type LineItem = {
@@ -44,6 +51,8 @@ const toLocalDateTime = (date: Date) =>
 
 export default function SalesCreatePage() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [sizeOptions, setSizeOptions] = useState<Size[]>([]);
+  const [showSizeManager, setShowSizeManager] = useState(false);
   const [items, setItems] = useState<LineItem[]>([]);
   const [soldAt, setSoldAt] = useState(toLocalDateTime(new Date()));
   const [note, setNote] = useState("");
@@ -51,9 +60,13 @@ export default function SalesCreatePage() {
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    apiFetch<Product[]>("/products")
-      .then((data) => {
+    Promise.all([
+      apiFetch<Product[]>("/products"),
+      apiFetch<Size[]>("/sizes?active=true"),
+    ])
+      .then(([data, sizes]) => {
         setProducts(data);
+        setSizeOptions(sizes);
         if (data.length > 0) {
           setItems([createItem(data[0].id)]);
         }
@@ -128,6 +141,13 @@ export default function SalesCreatePage() {
 
   return (
     <div className="min-h-screen px-6 py-12">
+      <SizeManager
+        open={showSizeManager}
+        onClose={() => setShowSizeManager(false)}
+        onUpdated={() =>
+          apiFetch<Size[]>("/sizes?active=true").then(setSizeOptions)
+        }
+      />
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
         <AppHeader
           label="销售开单"
@@ -169,7 +189,15 @@ export default function SalesCreatePage() {
                     .filter((v) => (item.color ? v.color === item.color : true))
                     .map((v) => v.size),
                 ),
-              );
+              ).sort((a, b) => {
+                const order = sizeOptions.map((size) => size.name);
+                const ai = order.indexOf(a);
+                const bi = order.indexOf(b);
+                if (ai === -1 && bi === -1) return a.localeCompare(b);
+                if (ai === -1) return 1;
+                if (bi === -1) return -1;
+                return ai - bi;
+              });
 
               return (
                 <div
@@ -190,7 +218,7 @@ export default function SalesCreatePage() {
                       </button>
                     ) : null}
                   </div>
-                  <div className="mt-3 grid gap-3 md:grid-cols-5">
+                  <div className="mt-3 grid gap-3 md:grid-cols-6">
                     <select
                       value={item.productId}
                       onChange={(event) =>
@@ -239,6 +267,13 @@ export default function SalesCreatePage() {
                         </option>
                       ))}
                     </select>
+                    <button
+                      type="button"
+                      onClick={() => setShowSizeManager(true)}
+                      className="rounded-2xl border border-[#e4d7c5] px-3 py-2 text-xs text-[#6b645a]"
+                    >
+                      管理尺码
+                    </button>
                     <input
                       value={item.qty}
                       onChange={(event) =>

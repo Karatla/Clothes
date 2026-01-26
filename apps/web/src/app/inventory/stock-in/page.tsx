@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import AppHeader from "@/app/components/app-header";
+import SizeManager from "@/app/components/size-manager";
 import { apiFetch } from "@/lib/api";
 
 type Variant = {
@@ -18,8 +19,16 @@ type Product = {
   variants: Variant[];
 };
 
+type Size = {
+  id: string;
+  name: string;
+  isActive: boolean;
+};
+
 export default function StockInPage() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [sizeOptions, setSizeOptions] = useState<Size[]>([]);
+  const [showSizeManager, setShowSizeManager] = useState(false);
   const [productId, setProductId] = useState<string | null>(null);
   const [color, setColor] = useState("");
   const [size, setSize] = useState("");
@@ -29,15 +38,21 @@ export default function StockInPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const loadSizes = async () => {
+    const data = await apiFetch<Size[]>("/sizes?active=true");
+    setSizeOptions(data);
+  };
+
+  const loadProducts = async () => {
+    const data = await apiFetch<Product[]>("/products");
+    setProducts(data);
+    if (data.length > 0) {
+      setProductId(data[0].id);
+    }
+  };
+
   useEffect(() => {
-    apiFetch<Product[]>("/products")
-      .then((data) => {
-        setProducts(data);
-        if (data.length > 0) {
-          setProductId(data[0].id);
-        }
-      })
-      .catch(() => null);
+    Promise.all([loadProducts(), loadSizes()]).catch(() => null);
   }, []);
 
   const selectedProduct = products.find((product) => product.id === productId);
@@ -53,8 +68,16 @@ export default function StockInPage() {
     selectedProduct?.variants
       .filter((variant) => (color ? variant.color === color : true))
       .forEach((variant) => set.add(variant.size));
-    return Array.from(set);
-  }, [selectedProduct, color]);
+    const order = sizeOptions.map((size) => size.name);
+    return Array.from(set).sort((a, b) => {
+      const ai = order.indexOf(a);
+      const bi = order.indexOf(b);
+      if (ai === -1 && bi === -1) return a.localeCompare(b);
+      if (ai === -1) return 1;
+      if (bi === -1) return -1;
+      return ai - bi;
+    });
+  }, [selectedProduct, color, sizeOptions]);
 
   const variantId = selectedProduct?.variants.find(
     (variant) => variant.color === color && variant.size === size,
@@ -96,6 +119,11 @@ export default function StockInPage() {
 
   return (
     <div className="min-h-screen px-6 py-12">
+      <SizeManager
+        open={showSizeManager}
+        onClose={() => setShowSizeManager(false)}
+        onUpdated={loadSizes}
+      />
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">
         <AppHeader
           label="进货入库"
@@ -143,18 +171,27 @@ export default function StockInPage() {
             </label>
             <label className="space-y-2 text-sm text-[#6b645a]">
               尺码
-              <select
-                value={size}
-                onChange={(event) => setSize(event.target.value)}
-                className="w-full rounded-2xl border border-[#e4d7c5] px-4 py-3 text-base"
-              >
-                <option value="">请选择尺码</option>
-                {sizes.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
+              <div className="flex gap-2">
+                <select
+                  value={size}
+                  onChange={(event) => setSize(event.target.value)}
+                  className="flex-1 rounded-2xl border border-[#e4d7c5] px-4 py-3 text-base"
+                >
+                  <option value="">请选择尺码</option>
+                  {sizes.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setShowSizeManager(true)}
+                  className="rounded-2xl border border-[#e4d7c5] px-4 text-sm text-[#6b645a]"
+                >
+                  管理
+                </button>
+              </div>
             </label>
             <label className="space-y-2 text-sm text-[#6b645a]">
               入库数量
