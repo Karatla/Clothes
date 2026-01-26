@@ -16,7 +16,7 @@ cd ../web
 npm run build
 5) Run API  
 cd ../api
-npm run start:prod
+npm run start:prod/node dist/src/main.js
 6) Run Web  
 cd ../web
 npm run start
