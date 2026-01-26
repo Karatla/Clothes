@@ -41,5 +41,5 @@ Default endpoint: http://localhost:3000/
 If you change the port later, update this section.
 
 ### Node Version
-Use Node 20.11.1 for best compatibility:
+Use Node 20.19.0 for best compatibility:
 - `nvm use`
