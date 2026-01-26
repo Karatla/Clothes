@@ -1,0 +1,89 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum StockMovementType {
+  IN
+  OUT
+  RETURN
+  ADJUST
+}
+
+model Category {
+  id        String    @id @default(uuid())
+  name      String
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  products  Product[]
+}
+
+model Product {
+  id         String    @id @default(uuid())
+  name       String
+  baseCode   String
+  categoryId String?
+  tags       Json?
+  imageUrl   String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  category   Category? @relation(fields: [categoryId], references: [id])
+  variants   Variant[]
+}
+
+model Variant {
+  id        String          @id @default(uuid())
+  productId String
+  color     String
+  size      String
+  qty       Int
+  costPrice Float
+  salePrice Float
+  sku       String          @unique
+  product   Product         @relation(fields: [productId], references: [id])
+  movements StockMovement[]
+  saleItems SaleItem[]
+}
+
+model StockMovement {
+  id        String            @id @default(uuid())
+  variantId String
+  saleId    String?
+  type      StockMovementType
+  qty       Int
+  unitCost  Float?
+  note      String?
+  createdAt DateTime          @default(now())
+  variant   Variant           @relation(fields: [variantId], references: [id])
+  sale      Sale?             @relation(fields: [saleId], references: [id])
+}
+
+model Sale {
+  id          String      @id @default(uuid())
+  saleNo      String      @unique
+  soldAt      DateTime
+  totalAmount Float
+  note        String?
+  createdAt   DateTime    @default(now())
+  items       SaleItem[]
+  movements   StockMovement[]
+}
+
+model SaleItem {
+  id        String   @id @default(uuid())
+  saleId    String
+  variantId String
+  qty       Int
+  unitPrice Float
+  lineTotal Float
+  sale      Sale     @relation(fields: [saleId], references: [id])
+  variant   Variant  @relation(fields: [variantId], references: [id])
+}

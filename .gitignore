@@ -13,6 +13,9 @@ apps/web/node_modules
 # NestJS
 apps/api/dist
 apps/api/node_modules
+/uploads
+/data
+apps/api/dev.db*
 
 # Logs
 npm-debug.log*
