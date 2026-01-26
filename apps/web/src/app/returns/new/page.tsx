@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import AppHeader from "@/app/components/app-header";
 import { apiFetch } from "@/lib/api";
+import { makeId } from "@/lib/id";
 
 type SaleItem = {
   id: string;
@@ -52,7 +53,7 @@ type ExchangeItem = {
 };
 
 const createExchangeItem = (productId: string) => ({
-  id: crypto.randomUUID(),
+  id: makeId(),
   productId,
   color: "",
   size: "",

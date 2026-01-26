@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import AppHeader from "@/app/components/app-header";
 import CategoryManager from "@/app/components/category-manager";
 import { API_BASE, apiFetch, uploadFile } from "@/lib/api";
+import { makeId } from "@/lib/id";
 
 const SIZES = ["S", "M", "L", "XL", "2XL"] as const;
 
@@ -36,7 +37,7 @@ type ColorRow = {
 const emptyCell = (): Cell => ({ qty: "", cost: "", price: "" });
 
 const createRow = (): ColorRow => ({
-  id: crypto.randomUUID(),
+  id: makeId(),
   name: "",
   cells: SIZES.reduce((acc, size) => {
     acc[size] = emptyCell();
