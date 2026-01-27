@@ -59,6 +59,7 @@ npx prisma generate
 
 
 第二阶段编译工程文件（有更新后执行第3——6布）
+0, npm install
 1、把.env文件复制到apps\api   下面
 2、把.env,local文件复制到web里面
 3、进入到api文件夹，运行 npx prisma generate，成功后
