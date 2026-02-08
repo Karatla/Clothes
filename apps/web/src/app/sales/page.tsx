@@ -38,6 +38,9 @@ export default function SalesListPage() {
   }, []);
 
   const handleDelete = async (id: string) => {
+    if (!window.confirm("确认删除这条销售记录？库存将自动回滚。")) {
+      return;
+    }
     await apiFetch(`/sales/${id}`, { method: "DELETE" });
     await loadSales();
   };

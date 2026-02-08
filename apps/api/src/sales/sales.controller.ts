@@ -77,8 +77,8 @@ export class SalesController {
       throw new BadRequestException('销售数量必须大于 0');
     }
 
-    if (normalizedItems.some((item) => item.unitPrice <= 0)) {
-      throw new BadRequestException('单价必须大于 0');
+    if (normalizedItems.some((item) => item.unitPrice < 0)) {
+      throw new BadRequestException('单价不能小于 0');
     }
 
     const variantIds = normalizedItems.map((item) => item.variantId);

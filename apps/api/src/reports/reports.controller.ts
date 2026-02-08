@@ -25,7 +25,7 @@ export class ReportsController {
     @Query('end') end?: string,
     @Query('groupBy') groupBy?: string,
   ) {
-    const { startDate, endDate } = this.resolveDateRange(start, end);
+    const { startDate, endDate } = this.resolveDateRange(start, end, true);
     const group = groupBy === 'product' ? 'product' : 'variant';
 
     const [saleItems, returnItems] = await Promise.all([

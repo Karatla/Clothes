@@ -75,7 +75,7 @@ export default function SizeManager({ open, onClose, onUpdated }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="w-full max-w-2xl rounded-3xl bg-white p-6 shadow-[0_30px_120px_-60px_rgba(27,20,12,0.6)]">
+      <div className="w-full max-w-2xl max-h-[80vh] overflow-hidden rounded-3xl bg-white p-6 shadow-[0_30px_120px_-60px_rgba(27,20,12,0.6)]">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-xl font-semibold text-[#1f1811]">管理尺码</h3>
@@ -114,7 +114,7 @@ export default function SizeManager({ open, onClose, onUpdated }: Props) {
           </div>
         ) : null}
 
-        <div className="mt-6 space-y-3">
+        <div className="mt-6 max-h-[50vh] space-y-3 overflow-y-auto pr-1">
           {sizes.map((size) => (
             <div
               key={size.id}

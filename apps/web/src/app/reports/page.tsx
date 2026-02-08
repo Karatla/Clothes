@@ -43,11 +43,12 @@ const toLocalDate = (date: Date) =>
 
 export default function ReportsPage() {
   const [groupBy, setGroupBy] = useState<"product" | "variant">("product");
-  const [start, setStart] = useState(toLocalDate(new Date(new Date().getFullYear(), new Date().getMonth(), 1)));
+  const [start, setStart] = useState(toLocalDate(new Date()));
   const [end, setEnd] = useState(toLocalDate(new Date()));
   const [report, setReport] = useState<ReportResponse | null>(null);
   const [daily, setDaily] = useState<DailyRow[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const loadReport = async () => {
     setError(null);
@@ -64,7 +65,14 @@ export default function ReportsPage() {
     ])
       .then(([, dailyData]) => setDaily(dailyData))
       .catch((err) => setError(err.message));
-  }, [groupBy, start, end]);
+  }, [groupBy, start, end, refreshKey]);
+
+  const handleToday = () => {
+    const today = toLocalDate(new Date());
+    setStart(today);
+    setEnd(today);
+    setRefreshKey((prev) => prev + 1);
+  };
 
   const profitChart = useMemo(() => {
     if (!report) return [];
@@ -153,6 +161,13 @@ export default function ReportsPage() {
                 className="ml-2 rounded-xl border border-[#e4d7c5] px-3 py-2 text-sm"
               />
             </label>
+            <button
+              type="button"
+              onClick={handleToday}
+              className="rounded-2xl border border-[#e4d7c5] bg-white px-4 py-2 text-sm"
+            >
+              今天
+            </button>
             <button
               type="button"
               onClick={handleDownload}

@@ -60,6 +60,7 @@ export class AuthController {
     res: Response,
     tokens: { accessToken: string; refreshToken: string },
   ) {
+    const accessMaxAge = 10 * 60 * 60 * 1000;
     const cookieOptions = {
       httpOnly: true,
       sameSite: 'lax' as const,
@@ -67,7 +68,10 @@ export class AuthController {
       path: '/',
     };
 
-    res.cookie(ACCESS_TOKEN_COOKIE, tokens.accessToken, cookieOptions);
+    res.cookie(ACCESS_TOKEN_COOKIE, tokens.accessToken, {
+      ...cookieOptions,
+      maxAge: accessMaxAge,
+    });
     res.cookie(REFRESH_TOKEN_COOKIE, tokens.refreshToken, cookieOptions);
   }
 }

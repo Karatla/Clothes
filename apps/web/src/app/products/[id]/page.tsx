@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import AppHeader from "@/app/components/app-header";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, resolveImageUrl } from "@/lib/api";
 
 type Variant = {
   id: string;
@@ -24,6 +24,8 @@ type Product = {
   imageUrl: string | null;
   tags: string[];
   categoryId: string | null;
+  isDeleted?: boolean;
+  deletedAt?: string | null;
   variants: Variant[];
 };
 
@@ -65,6 +67,8 @@ export default function ProductDetailPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [summary, setSummary] = useState<SummaryResponse | null>(null);
   const [movements, setMovements] = useState<Movement[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -82,6 +86,39 @@ export default function ProductDetailPage() {
       })
       .catch(() => null);
   }, [id]);
+
+  const handleDelete = async () => {
+    if (!product) return;
+    const confirmed = window.confirm("确认删除该商品？删除后可在此页面恢复。");
+    if (!confirmed) return;
+    setError(null);
+    setMessage(null);
+    try {
+      await apiFetch(`/products/${product.id}`, { method: "DELETE" });
+      setProduct({ ...product, isDeleted: true });
+      setMessage("商品已删除");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "删除失败");
+    }
+  };
+
+  const handleRestore = async () => {
+    if (!product) return;
+    const confirmed = window.confirm("确认恢复该商品？");
+    if (!confirmed) return;
+    setError(null);
+    setMessage(null);
+    try {
+      await apiFetch(`/products/${product.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ isDeleted: false }),
+      });
+      setProduct({ ...product, isDeleted: false });
+      setMessage("商品已恢复");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "恢复失败");
+    }
+  };
 
   const categoryName = useMemo(() => {
     if (!product?.categoryId) return "-";
@@ -144,11 +181,59 @@ export default function ProductDetailPage() {
           description={`商品编码 ${product.baseCode}`}
         />
 
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          {product.isDeleted ? (
+            <span className="rounded-full border border-[#f0c7b3] bg-[#fff1ea] px-3 py-1 text-xs text-[#b14d2a]">
+              已删除
+            </span>
+          ) : (
+            <span className="rounded-full border border-[#c9e2c8] bg-[#f1fff1] px-3 py-1 text-xs text-[#386641]">
+              正常
+            </span>
+          )}
+          <div className="flex gap-2">
+            {product.isDeleted ? (
+              <button
+                type="button"
+                onClick={handleRestore}
+                className="rounded-2xl border border-[#e4d7c5] px-4 py-2 text-sm text-[#6b645a]"
+              >
+                恢复商品
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleDelete}
+                className="rounded-2xl border border-[#f0c7b3] px-4 py-2 text-sm text-[#b14d2a]"
+              >
+                删除商品
+              </button>
+            )}
+          </div>
+        </div>
+
+        {product.deletedAt ? (
+          <div className="text-xs text-[#6b645a]">
+            删除时间：{new Date(product.deletedAt).toLocaleString("zh-CN")}
+          </div>
+        ) : null}
+
+        {error ? (
+          <div className="rounded-2xl border border-[#f0c7b3] bg-[#fff1ea] px-4 py-3 text-sm text-[#b14d2a]">
+            {error}
+          </div>
+        ) : null}
+        {message ? (
+          <div className="rounded-2xl border border-[#c9e2c8] bg-[#f1fff1] px-4 py-3 text-sm text-[#386641]">
+            {message}
+          </div>
+        ) : null}
+
         <section className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
           <div className="rounded-3xl bg-white/90 p-6 shadow-[0_25px_90px_-60px_rgba(36,27,14,0.4)]">
-            {product.imageUrl ? (
+            {resolveImageUrl(product.imageUrl) ? (
               <img
-                src={product.imageUrl}
+                src={resolveImageUrl(product.imageUrl) ?? ""}
                 alt={product.name}
                 className="h-64 w-full rounded-3xl bg-[#f5efe6] object-contain"
               />

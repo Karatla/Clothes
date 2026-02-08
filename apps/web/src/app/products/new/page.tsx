@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import AppHeader from "@/app/components/app-header";
 import CategoryManager from "@/app/components/category-manager";
 import SizeManager from "@/app/components/size-manager";
-import { API_BASE, apiFetch, uploadFile } from "@/lib/api";
+import { API_BASE, apiFetch, resolveImageUrl, uploadFile } from "@/lib/api";
 import { makeId } from "@/lib/id";
 
 type Category = {
@@ -233,28 +233,32 @@ export default function ProductEntryPage() {
       return;
     }
 
-    await apiFetch("/products", {
-      method: "POST",
-      body: JSON.stringify({
-        name,
-        baseCode,
-        categoryId,
-        tags: tags
-          .split(/[,，]/)
-          .map((tag) => tag.trim())
-          .filter(Boolean),
-        imageUrl,
-        variants,
-      }),
-    });
+    try {
+      await apiFetch("/products", {
+        method: "POST",
+        body: JSON.stringify({
+          name,
+          baseCode,
+          categoryId,
+          tags: tags
+            .split(/[,，]/)
+            .map((tag) => tag.trim())
+            .filter(Boolean),
+          imageUrl,
+          variants,
+        }),
+      });
 
-    setName("");
-    setBaseCode("");
-    setTags("");
-    setImageUrl(null);
-    setRows([createRow(sizeNames)]);
-    setSuccess("商品已保存");
-    await loadProducts();
+      setName("");
+      setBaseCode("");
+      setTags("");
+      setImageUrl(null);
+      setRows([createRow(sizeNames)]);
+      setSuccess("商品已保存");
+      await loadProducts();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "商品保存失败");
+    }
   };
 
   return (
@@ -362,10 +366,10 @@ export default function ProductEntryPage() {
                   />
                 </label>
               </div>
-              {imageUrl ? (
+              {resolveImageUrl(imageUrl) ? (
                 <div className="mt-4 flex items-center gap-4">
                   <img
-                    src={imageUrl}
+                    src={resolveImageUrl(imageUrl) ?? ""}
                     alt="商品图片预览"
                     className="h-24 w-24 rounded-2xl object-cover"
                   />
@@ -501,9 +505,9 @@ export default function ProductEntryPage() {
                   key={product.id}
                   className="flex items-center gap-3 rounded-2xl border border-[#eadfce] bg-[#fbf7f0] p-3"
                 >
-                  {product.imageUrl ? (
+                  {resolveImageUrl(product.imageUrl) ? (
                     <img
-                      src={product.imageUrl}
+                      src={resolveImageUrl(product.imageUrl) ?? ""}
                       alt={product.name}
                       className="h-12 w-12 rounded-2xl object-cover"
                     />

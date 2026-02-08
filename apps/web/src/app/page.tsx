@@ -15,18 +15,21 @@ import AppHeader from "./components/app-header";
 import { apiFetch } from "@/lib/api";
 
 export default function Home() {
-  const [range, setRange] = useState<"7" | "30" | "custom">("30");
+  const [range, setRange] = useState<"today" | "7" | "30" | "custom">("today");
   const [start, setStart] = useState<string>("");
   const [end, setEnd] = useState<string>("");
   const [daily, setDaily] = useState<Array<{ date: string; revenue: number; refunds: number }>>([]);
   const [topProducts, setTopProducts] = useState<Array<{ name: string; baseCode: string; revenue: number }>>([]);
   const [lowStock, setLowStock] = useState<Array<{ name: string; baseCode: string; totalQty: number }>>([]);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     const now = new Date();
     const endDate = new Date(now.getTime());
     const startDate = new Date(now.getTime());
-    if (range === "7") {
+    if (range === "today") {
+      startDate.setDate(endDate.getDate());
+    } else if (range === "7") {
       startDate.setDate(endDate.getDate() - 6);
     } else {
       startDate.setDate(endDate.getDate() - 29);
@@ -66,7 +69,7 @@ export default function Home() {
         setLowStock(low);
       })
       .catch(() => null);
-  }, [start, end]);
+  }, [start, end, refreshKey]);
 
   const revenueSeries = useMemo(
     () => daily.map((item) => ({
@@ -123,6 +126,16 @@ export default function Home() {
             <div className="flex items-center justify-between">
               <h3 className="text-base font-semibold text-[#1f1811]">销售趋势</h3>
               <div className="flex gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRange("today");
+                    setRefreshKey((prev) => prev + 1);
+                  }}
+                  className={`rounded-full px-3 py-1 ${range === "today" ? "bg-[#1f1811] text-white" : "border border-[#eadfce] text-[#6b645a]"}`}
+                >
+                  今天
+                </button>
                 <button
                   type="button"
                   onClick={() => setRange("7")}

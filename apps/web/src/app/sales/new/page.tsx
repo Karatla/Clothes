@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import AppHeader from "@/app/components/app-header";
-import SizeManager from "@/app/components/size-manager";
 import { apiFetch } from "@/lib/api";
 import { makeId } from "@/lib/id";
 
@@ -52,10 +51,10 @@ const toLocalDateTime = (date: Date) =>
 export default function SalesCreatePage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [sizeOptions, setSizeOptions] = useState<Size[]>([]);
-  const [showSizeManager, setShowSizeManager] = useState(false);
   const [items, setItems] = useState<LineItem[]>([]);
   const [soldAt, setSoldAt] = useState(toLocalDateTime(new Date()));
   const [note, setNote] = useState("");
+  const [search, setSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -112,13 +111,18 @@ export default function SalesCreatePage() {
         const variant = product?.variants.find(
           (v) => v.color === item.color && v.size === item.size,
         );
+        const qtyValue = item.qty === "" ? Number.NaN : Number(item.qty);
+        const priceValue = item.price === "" ? Number.NaN : Number(item.price);
         return {
           variantId: variant?.id,
-          qty: Number(item.qty),
-          unitPrice: Number(item.price),
+          qty: qtyValue,
+          unitPrice: priceValue,
         };
       })
-      .filter((item) => item.variantId && item.qty && item.unitPrice);
+      .filter(
+        (item) =>
+          item.variantId && item.qty > 0 && Number.isFinite(item.unitPrice),
+      );
 
     if (payloadItems.length === 0) {
       setError("请完善销售明细");
@@ -141,13 +145,6 @@ export default function SalesCreatePage() {
 
   return (
     <div className="min-h-screen px-6 py-12">
-      <SizeManager
-        open={showSizeManager}
-        onClose={() => setShowSizeManager(false)}
-        onUpdated={() =>
-          apiFetch<Size[]>("/sizes?active=true").then(setSizeOptions)
-        }
-      />
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
         <AppHeader
           label="销售开单"
@@ -156,7 +153,7 @@ export default function SalesCreatePage() {
         />
 
         <section className="rounded-3xl bg-white/90 p-8 shadow-[0_25px_90px_-60px_rgba(36,27,14,0.4)]">
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-3">
             <label className="space-y-2 text-sm text-[#6b645a]">
               销售日期
               <input
@@ -175,11 +172,35 @@ export default function SalesCreatePage() {
                 placeholder="可选"
               />
             </label>
+            <label className="space-y-2 text-sm text-[#6b645a]">
+              搜索款号/名称
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                className="w-full rounded-2xl border border-[#e4d7c5] px-4 py-3 text-base"
+                placeholder="如：5031 / 羽绒服"
+              />
+            </label>
           </div>
 
           <div className="mt-6 space-y-4">
             {items.map((item, index) => {
               const product = products.find((p) => p.id === item.productId);
+              const filteredProducts = products.filter((productItem) => {
+                const keyword = search.trim();
+                if (!keyword) return true;
+                return (
+                  productItem.name.includes(keyword) ||
+                  productItem.baseCode.includes(keyword)
+                );
+              });
+              const productOptions = filteredProducts.some(
+                (productItem) => productItem.id === item.productId,
+              )
+                ? filteredProducts
+                : product
+                  ? [product, ...filteredProducts]
+                  : filteredProducts;
               const colors = Array.from(
                 new Set(product?.variants.map((v) => v.color) ?? []),
               );
@@ -230,7 +251,7 @@ export default function SalesCreatePage() {
                       }
                       className="rounded-2xl border border-[#e4d7c5] px-3 py-2 text-sm"
                     >
-                      {products.map((productItem) => (
+                      {productOptions.map((productItem) => (
                         <option key={productItem.id} value={productItem.id}>
                           {productItem.name} ({productItem.baseCode})
                         </option>
@@ -267,13 +288,6 @@ export default function SalesCreatePage() {
                         </option>
                       ))}
                     </select>
-                    <button
-                      type="button"
-                      onClick={() => setShowSizeManager(true)}
-                      className="rounded-2xl border border-[#e4d7c5] px-3 py-2 text-xs text-[#6b645a]"
-                    >
-                      管理尺码
-                    </button>
                     <input
                       value={item.qty}
                       onChange={(event) =>

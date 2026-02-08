@@ -36,3 +36,14 @@ export async function uploadFile(file: File) {
 
   return response.json() as Promise<{ url: string }>;
 }
+
+export function resolveImageUrl(url?: string | null) {
+  if (!url) return null;
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  if (url.startsWith('/')) {
+    return `${API_BASE}${url}`;
+  }
+  return `${API_BASE}/${url}`;
+}

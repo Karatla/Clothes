@@ -2,10 +2,14 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   Param,
+  Patch,
   Post,
+  Query,
 } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 type ProductInput = {
@@ -29,10 +33,44 @@ export class ProductsController {
   constructor(private readonly prisma: PrismaService) {}
 
   @Get()
-  list() {
+  list(
+    @Query('deleted') deleted?: string,
+    @Query('keyword') keyword?: string,
+    @Query('start') start?: string,
+    @Query('end') end?: string,
+  ) {
+    const includeDeleted = deleted === 'all';
+    const deletedOnly = deleted === 'true';
+    const trimmedKeyword = keyword?.trim();
+    const hasKeyword = Boolean(trimmedKeyword);
+    const where: Prisma.ProductWhereInput | undefined = includeDeleted
+      ? undefined
+      : {
+          isDeleted: deletedOnly,
+        };
+
+    if (where && hasKeyword && trimmedKeyword) {
+      where.OR = [
+        { name: { contains: trimmedKeyword } },
+        { baseCode: { contains: trimmedKeyword } },
+      ];
+    }
+
+    if (where && deletedOnly && (start || end)) {
+      const startDate = start ? new Date(start) : undefined;
+      const endDate = end ? new Date(end) : undefined;
+      if (endDate) {
+        endDate.setHours(23, 59, 59, 999);
+      }
+      where.deletedAt = {
+        ...(startDate ? { gte: startDate } : null),
+        ...(endDate ? { lte: endDate } : null),
+      };
+    }
     return this.prisma.product.findMany({
+      where,
       include: { variants: true },
-      orderBy: { createdAt: 'desc' },
+      orderBy: deletedOnly ? { deletedAt: 'desc' } : { createdAt: 'desc' },
     });
   }
 
@@ -51,6 +89,15 @@ export class ProductsController {
 
     if (!name || !baseCode) {
       throw new BadRequestException('商品名称和基础编码不能为空');
+    }
+
+    const existing = await this.prisma.product.findFirst({
+      where: { baseCode },
+      select: { id: true },
+    });
+
+    if (existing) {
+      throw new BadRequestException('款号已存在，请勿重复录入');
     }
 
     const variants = (body.variants ?? []).filter(
@@ -74,6 +121,8 @@ export class ProductsController {
         categoryId: body.categoryId ?? null,
         tags: body.tags ?? [],
         imageUrl: body.imageUrl ?? null,
+        isDeleted: false,
+        deletedAt: null,
         variants: {
           create: variants.map((variant) => ({
             color: variant.color ?? '',
@@ -86,6 +135,34 @@ export class ProductsController {
         },
       },
       include: { variants: true },
+    });
+  }
+
+  @Patch(':id')
+  async update(
+    @Param('id') id: string,
+    @Body() body: { isDeleted?: boolean },
+  ) {
+    const shouldDelete = body.isDeleted === true;
+    const shouldRestore = body.isDeleted === false;
+    return this.prisma.product.update({
+      where: { id },
+      data: {
+        isDeleted: body.isDeleted,
+        deletedAt: shouldDelete
+          ? new Date()
+          : shouldRestore
+            ? null
+            : undefined,
+      },
+    });
+  }
+
+  @Delete(':id')
+  async remove(@Param('id') id: string) {
+    return this.prisma.product.update({
+      where: { id },
+      data: { isDeleted: true, deletedAt: new Date() },
     });
   }
 }
