@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import AppHeader from "@/app/components/app-header";
-import { apiFetch, resolveImageUrl } from "@/lib/api";
+import { API_BASE, apiFetch, resolveImageUrl, uploadFile } from "@/lib/api";
 
 type Variant = {
   id: string;
@@ -69,6 +69,7 @@ export default function ProductDetailPage() {
   const [movements, setMovements] = useState<Movement[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -117,6 +118,44 @@ export default function ProductDetailPage() {
       setMessage("商品已恢复");
     } catch (err) {
       setError(err instanceof Error ? err.message : "恢复失败");
+    }
+  };
+
+  const handleImageChange = async (file: File | null) => {
+    if (!product || !file) return;
+    setError(null);
+    setMessage(null);
+    setUploadingImage(true);
+
+    try {
+      const { url } = await uploadFile(file);
+      await apiFetch(`/products/${product.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ imageUrl: `${API_BASE}${url}` }),
+      });
+      setProduct({ ...product, imageUrl: `${API_BASE}${url}` });
+      setMessage("商品图片已更新");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "图片更新失败");
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleRemoveImage = async () => {
+    if (!product) return;
+    setError(null);
+    setMessage(null);
+
+    try {
+      await apiFetch(`/products/${product.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ imageUrl: null }),
+      });
+      setProduct({ ...product, imageUrl: null });
+      setMessage("商品图片已移除");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "图片移除失败");
     }
   };
 
@@ -232,14 +271,55 @@ export default function ProductDetailPage() {
         <section className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
           <div className="rounded-3xl bg-white/90 p-6 shadow-[0_25px_90px_-60px_rgba(36,27,14,0.4)]">
             {resolveImageUrl(product.imageUrl) ? (
-              <img
-                src={resolveImageUrl(product.imageUrl) ?? ""}
-                alt={product.name}
-                className="h-64 w-full rounded-3xl bg-[#f5efe6] object-contain"
-              />
+              <div className="space-y-4">
+                <img
+                  src={resolveImageUrl(product.imageUrl) ?? ""}
+                  alt={product.name}
+                  className="h-64 w-full rounded-3xl bg-[#f5efe6] object-contain"
+                />
+                <div className="flex flex-wrap gap-3">
+                  <label className="rounded-2xl bg-[#a7652d] px-4 py-2 text-sm font-semibold text-white">
+                    {uploadingImage ? "上传中..." : "更换图片"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={uploadingImage}
+                      onChange={(event) => {
+                        const file = event.target.files?.[0] ?? null;
+                        void handleImageChange(file);
+                        event.target.value = "";
+                      }}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => void handleRemoveImage()}
+                    className="rounded-2xl border border-[#e4d7c5] px-4 py-2 text-sm text-[#6b645a]"
+                  >
+                    移除图片
+                  </button>
+                </div>
+              </div>
             ) : (
-              <div className="flex h-64 items-center justify-center rounded-3xl bg-[#eadfce] text-sm text-[#6b645a]">
-                暂无图片
+              <div className="space-y-4">
+                <div className="flex h-64 items-center justify-center rounded-3xl bg-[#eadfce] text-sm text-[#6b645a]">
+                  暂无图片
+                </div>
+                <label className="inline-flex rounded-2xl bg-[#a7652d] px-4 py-2 text-sm font-semibold text-white">
+                  {uploadingImage ? "上传中..." : "上传图片"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={uploadingImage}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0] ?? null;
+                      void handleImageChange(file);
+                      event.target.value = "";
+                    }}
+                  />
+                </label>
               </div>
             )}
           </div>

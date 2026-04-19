@@ -189,13 +189,14 @@ export class ProductsController {
   @Patch(':id')
   async update(
     @Param('id') id: string,
-    @Body() body: { isDeleted?: boolean },
+    @Body() body: { isDeleted?: boolean; imageUrl?: string | null },
   ) {
     const shouldDelete = body.isDeleted === true;
     const shouldRestore = body.isDeleted === false;
     return this.prisma.product.update({
       where: { id },
       data: {
+        imageUrl: body.imageUrl,
         isDeleted: body.isDeleted,
         deletedAt: shouldDelete
           ? new Date()
