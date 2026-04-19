@@ -82,3 +82,30 @@ npx prisma generate
 3、运行网页端：  npm run start  (前端服务器启动）必须在WeB目录下
 4、CTRT+鼠标左键，启动网页端
 CTRT+C退出终端
+
+## 新程序的更新步骤
+
+当收到新程序更新后，请按下面步骤操作：
+
+1. 进入 `apps/api` 目录
+2. 执行数据库迁移：
+   ```bash
+   npx prisma migrate deploy
+   ```
+3. 重新生成 Prisma 客户端：
+   ```bash
+   npx prisma generate
+   ```
+4. 在 `apps/api` 目录执行编译：
+   ```bash
+   npm run build
+   ```
+5. 进入 `apps/web` 目录执行编译：
+   ```bash
+   npm run build
+   ```
+
+说明：
+- `npx prisma migrate deploy`：把新版本数据库结构更新到本地已有数据库，不会像重置数据库那样清空原有数据
+- `npx prisma generate`：根据最新数据库结构重新生成 Prisma 客户端
+- 这两个命令都需要在 `apps/api` 目录中执行

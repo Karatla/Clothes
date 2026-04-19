@@ -15,12 +15,25 @@ import { PrismaService } from '../prisma/prisma.service';
 export class CategoriesController {
   constructor(private readonly prisma: PrismaService) {}
 
+  private async ensureUniqueName(name: string, excludeId?: string) {
+    const existing = await this.prisma.category.findFirst({
+      where: {
+        name,
+        ...(excludeId ? { id: { not: excludeId } } : null),
+      },
+    });
+
+    if (existing) {
+      throw new BadRequestException('分类已存在，请勿重复添加');
+    }
+  }
+
   @Get()
   list(@Query('active') active?: string) {
     const activeOnly = active === 'true';
     return this.prisma.category.findMany({
       where: activeOnly ? { isActive: true } : undefined,
-      orderBy: { createdAt: 'asc' },
+      orderBy: { name: 'asc' },
     });
   }
 
@@ -31,6 +44,8 @@ export class CategoriesController {
       throw new BadRequestException('分类名称不能为空');
     }
 
+    await this.ensureUniqueName(name);
+
     return this.prisma.category.create({
       data: {
         name,
@@ -40,17 +55,23 @@ export class CategoriesController {
   }
 
   @Patch(':id')
-  update(
+  async update(
     @Param('id') id: string,
     @Body() body: { name?: string; isActive?: boolean },
   ) {
-    if (body.name !== undefined && !body.name.trim()) {
+    const name = body.name?.trim();
+    if (body.name !== undefined && !name) {
       throw new BadRequestException('分类名称不能为空');
     }
+
+    if (name) {
+      await this.ensureUniqueName(name, id);
+    }
+
     return this.prisma.category.update({
       where: { id },
       data: {
-        name: body.name?.trim(),
+        name,
         isActive: body.isActive,
       },
     });

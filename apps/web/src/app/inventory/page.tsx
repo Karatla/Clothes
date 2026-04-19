@@ -81,6 +81,11 @@ export default function InventorySummaryPage() {
     return new Date(summary.updatedAt).toLocaleString("zh-CN");
   }, [summary?.updatedAt]);
 
+  const sortedCategories = useMemo(
+    () => [...categories].sort((a, b) => a.name.localeCompare(b.name, "zh-CN")),
+    [categories],
+  );
+
   return (
     <div className="min-h-screen px-6 py-12">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
@@ -90,7 +95,13 @@ export default function InventorySummaryPage() {
           description="查看每个商品的库存汇总与颜色尺码明细。"
         />
 
-        <div className="flex justify-end">
+        <div className="flex flex-wrap justify-end gap-3">
+          <a
+            href="/inventory/sold-out"
+            className="rounded-2xl border border-[#e4d7c5] px-4 py-2 text-sm text-[#6b645a]"
+          >
+            已售空商品
+          </a>
           <a
             href="/products/deleted"
             className="rounded-2xl border border-[#e4d7c5] px-4 py-2 text-sm text-[#6b645a]"
@@ -109,7 +120,7 @@ export default function InventorySummaryPage() {
                 className="w-full rounded-2xl border border-[#e4d7c5] px-4 py-3 text-base"
               >
                 <option value="">全部分类</option>
-                {categories.map((category) => (
+                {sortedCategories.map((category) => (
                   <option key={category.id} value={category.id}>
                     {category.name}
                   </option>

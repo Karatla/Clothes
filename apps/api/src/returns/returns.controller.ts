@@ -5,7 +5,9 @@ import {
   Get,
   Param,
   Post,
+  Query,
 } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 type ReturnItemInput = {
@@ -21,13 +23,69 @@ type ReturnInput = {
   items?: ReturnItemInput[];
 };
 
+type ReturnSearchType =
+  | 'default'
+  | 'productCode'
+  | 'saleNo'
+  | 'returnNo'
+  | 'returnId';
+
 @Controller('returns')
 export class ReturnsController {
   constructor(private readonly prisma: PrismaService) {}
 
   @Get()
-  list() {
+  async list(
+    @Query('start') start?: string,
+    @Query('end') end?: string,
+    @Query('minAmount') minAmount?: string,
+    @Query('maxAmount') maxAmount?: string,
+    @Query('searchType') searchType?: string,
+    @Query('keyword') keyword?: string,
+  ) {
+    const where: Prisma.ReturnWhereInput = {};
+    const returnedAt = this.resolveDateRange(start, end);
+    if (returnedAt) {
+      where.returnedAt = returnedAt;
+    }
+
+    const normalizedType = this.normalizeSearchType(searchType);
+    const trimmedKeyword = keyword?.trim();
+    if (trimmedKeyword) {
+      if (normalizedType === 'productCode') {
+        where.items = {
+          some: {
+            variant: {
+              product: {
+                baseCode: { contains: trimmedKeyword },
+              },
+            },
+          },
+        };
+      } else if (normalizedType === 'saleNo') {
+        where.sale = {
+          is: {
+            saleNo: { contains: trimmedKeyword },
+          },
+        };
+      } else if (normalizedType === 'returnNo') {
+        where.returnNo = { contains: trimmedKeyword };
+      } else if (normalizedType === 'returnId') {
+        where.id = { contains: trimmedKeyword };
+      }
+    }
+
+    const normalizedMinAmount = this.parseOptionalNumber(minAmount);
+    const normalizedMaxAmount = this.parseOptionalNumber(maxAmount);
+    if (normalizedMinAmount !== null || normalizedMaxAmount !== null) {
+      where.totalAmount = {
+        ...(normalizedMinAmount !== null ? { gte: normalizedMinAmount } : null),
+        ...(normalizedMaxAmount !== null ? { lte: normalizedMaxAmount } : null),
+      };
+    }
+
     return this.prisma.return.findMany({
+      where,
       include: {
         sale: true,
         items: {
@@ -162,9 +220,50 @@ export class ReturnsController {
 
       return tx.return.findUnique({
         where: { id: ret.id },
-        include: { items: true, sale: true },
+        include: {
+          items: {
+            include: {
+              variant: { include: { product: true } },
+            },
+          },
+          sale: true,
+        },
       });
     });
+  }
+
+  private normalizeSearchType(searchType?: string): ReturnSearchType {
+    if (searchType === 'productCode') return 'productCode';
+    if (searchType === 'saleNo') return 'saleNo';
+    if (searchType === 'returnNo') return 'returnNo';
+    if (searchType === 'returnId') return 'returnId';
+    return 'default';
+  }
+
+  private parseOptionalNumber(value?: string) {
+    if (!value?.trim()) {
+      return null;
+    }
+
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  private resolveDateRange(start?: string, end?: string) {
+    if (!start && !end) {
+      return undefined;
+    }
+
+    const returnedAt: Prisma.DateTimeFilter = {};
+    if (start) {
+      returnedAt.gte = new Date(start);
+    }
+    if (end) {
+      const endDate = new Date(end);
+      endDate.setHours(23, 59, 59, 999);
+      returnedAt.lte = endDate;
+    }
+    return returnedAt;
   }
 
   private async createReturnNo(returnedAt: Date) {

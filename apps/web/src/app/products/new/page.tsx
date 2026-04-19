@@ -71,6 +71,10 @@ export default function ProductEntryPage() {
   const [success, setSuccess] = useState<string | null>(null);
 
   const sizeNames = sizes.map((size) => size.name);
+  const sortedCategories = useMemo(
+    () => [...categories].sort((a, b) => a.name.localeCompare(b.name, "zh-CN")),
+    [categories],
+  );
 
   const loadCategories = async () => {
     const data = await apiFetch<Category[]>("/categories?active=true");
@@ -310,7 +314,7 @@ export default function ProductEntryPage() {
                     onChange={(event) => setCategoryId(event.target.value)}
                     className="flex-1 rounded-2xl border border-[#e4d7c5] px-4 py-3 text-base text-[#1f1811]"
                   >
-                    {categories.map((category) => (
+                    {sortedCategories.map((category) => (
                       <option key={category.id} value={category.id}>
                         {category.name}
                       </option>

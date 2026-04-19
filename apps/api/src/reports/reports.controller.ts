@@ -86,7 +86,7 @@ export class ReportsController {
 
       row.soldQty += item.qty;
       row.revenue += item.lineTotal;
-      row.cost += item.qty * variant.costPrice;
+      row.cost += item.lineCost ?? item.qty * (item.unitCostSnapshot ?? variant.costPrice);
     });
 
     returnItems.forEach((item) => {

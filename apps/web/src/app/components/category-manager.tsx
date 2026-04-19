@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api";
 
 type Category = {
@@ -18,6 +18,7 @@ type Props = {
 export default function CategoryManager({ open, onClose, onUpdated }: Props) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [name, setName] = useState("");
+  const [search, setSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const load = async () => {
@@ -31,29 +32,65 @@ export default function CategoryManager({ open, onClose, onUpdated }: Props) {
     }
   }, [open]);
 
+  const filteredCategories = useMemo(() => {
+    const keyword = search.trim();
+    return categories
+      .filter((category) => (keyword ? category.name.includes(keyword) : true))
+      .sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
+  }, [categories, search]);
+
   const handleCreate = async () => {
-    if (!name.trim()) {
+    const trimmedName = name.trim();
+    if (!trimmedName) {
       setError("请输入分类名称");
       return;
     }
 
-    await apiFetch("/categories", {
-      method: "POST",
-      body: JSON.stringify({ name }),
-    });
-    setName("");
-    setError(null);
-    await load();
-    onUpdated();
+    if (categories.some((category) => category.name === trimmedName)) {
+      setError("分类已存在，请勿重复添加");
+      return;
+    }
+
+    try {
+      await apiFetch("/categories", {
+        method: "POST",
+        body: JSON.stringify({ name: trimmedName }),
+      });
+      setName("");
+      setError(null);
+      await load();
+      onUpdated();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "分类保存失败");
+    }
   };
 
   const handleRename = async (id: string, value: string) => {
-    await apiFetch(`/categories/${id}`, {
-      method: "PATCH",
-      body: JSON.stringify({ name: value }),
-    });
-    await load();
-    onUpdated();
+    const trimmedValue = value.trim();
+    const current = categories.find((category) => category.id === id);
+    if (!current || current.name === trimmedValue) {
+      return;
+    }
+    if (!trimmedValue) {
+      setError("分类名称不能为空");
+      return;
+    }
+    if (categories.some((category) => category.id !== id && category.name === trimmedValue)) {
+      setError("分类已存在，请勿重复添加");
+      return;
+    }
+
+    try {
+      await apiFetch(`/categories/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ name: trimmedValue }),
+      });
+      setError(null);
+      await load();
+      onUpdated();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "分类更新失败");
+    }
   };
 
   const handleToggle = async (id: string, isActive: boolean) => {
@@ -108,6 +145,15 @@ export default function CategoryManager({ open, onClose, onUpdated }: Props) {
           </button>
         </div>
 
+        <div className="mt-4">
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="搜索分类名称"
+            className="w-full rounded-2xl border border-[#e4d7c5] px-4 py-2 text-sm"
+          />
+        </div>
+
         {error ? (
           <div className="mt-4 rounded-2xl border border-[#f0c7b3] bg-[#fff1ea] px-4 py-2 text-sm text-[#b14d2a]">
             {error}
@@ -115,7 +161,7 @@ export default function CategoryManager({ open, onClose, onUpdated }: Props) {
         ) : null}
 
         <div className="mt-6 max-h-[50vh] space-y-3 overflow-y-auto pr-1">
-          {categories.map((category) => (
+          {filteredCategories.map((category) => (
             <div
               key={category.id}
               className="flex flex-wrap items-center gap-3 rounded-2xl border border-[#eadfce] bg-[#fbf7f0] px-4 py-3"
@@ -143,6 +189,11 @@ export default function CategoryManager({ open, onClose, onUpdated }: Props) {
               </button>
             </div>
           ))}
+          {filteredCategories.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-[#eadfce] px-4 py-6 text-center text-sm text-[#6b645a]">
+              没有匹配的分类
+            </div>
+          ) : null}
         </div>
       </div>
     </div>

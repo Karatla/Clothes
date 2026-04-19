@@ -10,6 +10,7 @@ type Variant = {
   color: string;
   size: string;
   sku: string;
+  currentQty: number;
 };
 
 type Product = {
@@ -81,6 +82,13 @@ export default function SalesCreatePage() {
     }, 0);
   }, [items]);
 
+  const getVariant = (item: LineItem) => {
+    const product = products.find((p) => p.id === item.productId);
+    return product?.variants.find(
+      (variant) => variant.color === item.color && variant.size === item.size,
+    );
+  };
+
   const updateItem = (id: string, patch: Partial<LineItem>) => {
     setItems((prev) =>
       prev.map((item) => (item.id === id ? { ...item, ...patch } : item)),
@@ -107,10 +115,7 @@ export default function SalesCreatePage() {
 
     const payloadItems = items
       .map((item) => {
-        const product = products.find((p) => p.id === item.productId);
-        const variant = product?.variants.find(
-          (v) => v.color === item.color && v.size === item.size,
-        );
+        const variant = getVariant(item);
         const qtyValue = item.qty === "" ? Number.NaN : Number(item.qty);
         const priceValue = item.price === "" ? Number.NaN : Number(item.price);
         return {
@@ -124,8 +129,19 @@ export default function SalesCreatePage() {
           item.variantId && item.qty > 0 && Number.isFinite(item.unitPrice),
       );
 
-    if (payloadItems.length === 0) {
-      setError("请完善销售明细");
+    if (payloadItems.length !== items.length) {
+      setError("请完善每一条销售明细");
+      return;
+    }
+
+    const exceededItem = items.find((item) => {
+      const variant = getVariant(item);
+      const qtyValue = Number(item.qty) || 0;
+      return variant && qtyValue > variant.currentQty;
+    });
+
+    if (exceededItem) {
+      setError("销售数量不能超过剩余库存");
       return;
     }
 
@@ -186,6 +202,8 @@ export default function SalesCreatePage() {
           <div className="mt-6 space-y-4">
             {items.map((item, index) => {
               const product = products.find((p) => p.id === item.productId);
+              const selectedVariant = getVariant(item);
+              const qtyValue = Number(item.qty) || 0;
               const filteredProducts = products.filter((productItem) => {
                 const keyword = search.trim();
                 if (!keyword) return true;
@@ -293,7 +311,7 @@ export default function SalesCreatePage() {
                       onChange={(event) =>
                         updateItem(item.id, { qty: event.target.value })
                       }
-                      className="rounded-2xl border border-[#e4d7c5] px-3 py-2 text-sm"
+                      className={`rounded-2xl border px-3 py-2 text-sm ${selectedVariant && qtyValue > selectedVariant.currentQty ? "border-[#d96b48] bg-[#fff3ee]" : "border-[#e4d7c5]"}`}
                       placeholder="数量"
                     />
                     <input
@@ -304,6 +322,14 @@ export default function SalesCreatePage() {
                       className="rounded-2xl border border-[#e4d7c5] px-3 py-2 text-sm"
                       placeholder="单价"
                     />
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-[#8a8073]">
+                    <span>
+                      剩余库存 {selectedVariant ? selectedVariant.currentQty : "请选择颜色和尺码"}
+                    </span>
+                    {selectedVariant && qtyValue > selectedVariant.currentQty ? (
+                      <span className="text-[#b14d2a]">输入数量超过剩余库存</span>
+                    ) : null}
                   </div>
                 </div>
               );

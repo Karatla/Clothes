@@ -6,6 +6,7 @@ import {
   Get,
   Param,
   Post,
+  Query,
 } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -22,13 +23,59 @@ type SaleInput = {
   items?: SaleItemInput[];
 };
 
+type SaleSearchType = 'default' | 'productCode' | 'saleNo' | 'saleId';
+
+type SaleRecord = Prisma.SaleGetPayload<{
+  include: {
+    items: {
+      include: {
+        variant: { include: { product: true } };
+      };
+    };
+  };
+}>;
+
 @Controller('sales')
 export class SalesController {
   constructor(private readonly prisma: PrismaService) {}
 
   @Get()
-  list() {
-    return this.prisma.sale.findMany({
+  async list(
+    @Query('start') start?: string,
+    @Query('end') end?: string,
+    @Query('minProfit') minProfit?: string,
+    @Query('maxProfit') maxProfit?: string,
+    @Query('searchType') searchType?: string,
+    @Query('keyword') keyword?: string,
+  ) {
+    const where: Prisma.SaleWhereInput = {};
+    const soldAt = this.resolveDateRange(start, end);
+    if (soldAt) {
+      where.soldAt = soldAt;
+    }
+
+    const normalizedType = this.normalizeSearchType(searchType);
+    const trimmedKeyword = keyword?.trim();
+    if (trimmedKeyword) {
+      if (normalizedType === 'productCode') {
+        where.items = {
+          some: {
+            variant: {
+              product: {
+                baseCode: { contains: trimmedKeyword },
+              },
+            },
+          },
+        };
+      } else if (normalizedType === 'saleNo') {
+        where.saleNo = { contains: trimmedKeyword };
+      } else if (normalizedType === 'saleId') {
+        where.id = { contains: trimmedKeyword };
+      }
+    }
+
+    const sales = await this.prisma.sale.findMany({
+      where,
       include: {
         items: {
           include: {
@@ -38,11 +85,30 @@ export class SalesController {
       },
       orderBy: { soldAt: 'desc' },
     });
+
+    const normalizedMinProfit = this.parseOptionalNumber(minProfit);
+    const normalizedMaxProfit = this.parseOptionalNumber(maxProfit);
+
+    return this.decorateSales(sales).filter((sale) => {
+      if (
+        normalizedMinProfit !== null &&
+        sale.totalProfit < normalizedMinProfit
+      ) {
+        return false;
+      }
+      if (
+        normalizedMaxProfit !== null &&
+        sale.totalProfit > normalizedMaxProfit
+      ) {
+        return false;
+      }
+      return true;
+    });
   }
 
   @Get(':id')
-  get(@Param('id') id: string) {
-    return this.prisma.sale.findUnique({
+  async get(@Param('id') id: string) {
+    const sale = await this.prisma.sale.findUnique({
       where: { id },
       include: {
         items: {
@@ -52,6 +118,12 @@ export class SalesController {
         },
       },
     });
+
+    if (!sale) {
+      return null;
+    }
+
+    return this.decorateSales([sale])[0] ?? null;
   }
 
   @Post()
@@ -99,6 +171,7 @@ export class SalesController {
       {} as Record<string, number>,
     );
 
+    const variantMap = new Map(variants.map((variant) => [variant.id, variant]));
     const stockMap = new Map(
       variants.map((variant) => [
         variant.id,
@@ -113,7 +186,21 @@ export class SalesController {
       }
     }
 
-    const totalAmount = normalizedItems.reduce(
+    const preparedItems = normalizedItems.map((item) => {
+      const variant = variantMap.get(item.variantId);
+      if (!variant) {
+        throw new BadRequestException('找不到销售商品');
+      }
+
+      const unitCostSnapshot = variant.costPrice;
+      return {
+        ...item,
+        unitCostSnapshot,
+        lineCost: item.qty * unitCostSnapshot,
+      };
+    });
+
+    const totalAmount = preparedItems.reduce(
       (sum, item) => sum + item.qty * item.unitPrice,
       0,
     );
@@ -130,18 +217,20 @@ export class SalesController {
               totalAmount,
               note: body.note ?? null,
               items: {
-                create: normalizedItems.map((item) => ({
+                create: preparedItems.map((item) => ({
                   variantId: item.variantId,
                   qty: item.qty,
                   unitPrice: item.unitPrice,
+                  unitCostSnapshot: item.unitCostSnapshot,
                   lineTotal: item.qty * item.unitPrice,
+                  lineCost: item.lineCost,
                 })),
               },
             },
           });
 
           await tx.stockMovement.createMany({
-            data: normalizedItems.map((item) => ({
+            data: preparedItems.map((item) => ({
               variantId: item.variantId,
               saleId: sale.id,
               type: 'OUT',
@@ -151,10 +240,18 @@ export class SalesController {
             })),
           });
 
-          return tx.sale.findUnique({
+          const savedSale = await tx.sale.findUnique({
             where: { id: sale.id },
-            include: { items: true },
+            include: {
+              items: {
+                include: {
+                  variant: { include: { product: true } },
+                },
+              },
+            },
           });
+
+          return savedSale ? this.decorateSales([savedSale])[0] : null;
         } catch (error) {
           if ((error as { code?: string })?.code === 'P2002') {
             continue;
@@ -189,6 +286,71 @@ export class SalesController {
       await tx.sale.delete({ where: { id: sale.id } });
       return { ok: true };
     });
+  }
+
+  private decorateSales(sales: SaleRecord[]) {
+    return sales.map((sale) => {
+      let totalCost = 0;
+      let profitEstimated = false;
+
+      const items = sale.items.map((item) => {
+        const unitCost = item.unitCostSnapshot ?? item.variant.costPrice;
+        const lineCost = item.lineCost ?? item.qty * unitCost;
+        if (item.unitCostSnapshot === null || item.lineCost === null) {
+          profitEstimated = true;
+        }
+        totalCost += lineCost;
+
+        return {
+          ...item,
+          unitCost,
+          lineCost,
+          profit: item.lineTotal - lineCost,
+          profitEstimated: item.unitCostSnapshot === null || item.lineCost === null,
+        };
+      });
+
+      return {
+        ...sale,
+        items,
+        totalCost,
+        totalProfit: sale.totalAmount - totalCost,
+        profitEstimated,
+      };
+    });
+  }
+
+  private normalizeSearchType(searchType?: string): SaleSearchType {
+    if (searchType === 'productCode') return 'productCode';
+    if (searchType === 'saleNo') return 'saleNo';
+    if (searchType === 'saleId') return 'saleId';
+    return 'default';
+  }
+
+  private parseOptionalNumber(value?: string) {
+    if (!value?.trim()) {
+      return null;
+    }
+
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  private resolveDateRange(start?: string, end?: string) {
+    if (!start && !end) {
+      return undefined;
+    }
+
+    const soldAt: Prisma.DateTimeFilter = {};
+    if (start) {
+      soldAt.gte = new Date(start);
+    }
+    if (end) {
+      const endDate = new Date(end);
+      endDate.setHours(23, 59, 59, 999);
+      soldAt.lte = endDate;
+    }
+    return soldAt;
   }
 
   private async createSaleNo(tx: Prisma.TransactionClient, soldAt: Date) {

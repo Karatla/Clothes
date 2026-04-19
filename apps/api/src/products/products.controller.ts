@@ -32,8 +32,47 @@ type ProductInput = {
 export class ProductsController {
   constructor(private readonly prisma: PrismaService) {}
 
+  private async withCurrentQty<T extends { variants: Array<{ id: string; qty: number }> }>(
+    products: T[],
+  ) {
+    const variantIds = products.flatMap((product) =>
+      product.variants.map((variant) => variant.id),
+    );
+
+    if (variantIds.length === 0) {
+      return products.map((product) => ({
+        ...product,
+        variants: product.variants.map((variant) => ({
+          ...variant,
+          currentQty: variant.qty,
+        })),
+      }));
+    }
+
+    const movementTotals = await this.prisma.stockMovement.groupBy({
+      by: ['variantId'],
+      where: { variantId: { in: variantIds } },
+      _sum: { qty: true },
+    });
+
+    const movementMap = new Map(
+      movementTotals.map((movement) => [
+        movement.variantId,
+        movement._sum.qty ?? 0,
+      ]),
+    );
+
+    return products.map((product) => ({
+      ...product,
+      variants: product.variants.map((variant) => ({
+        ...variant,
+        currentQty: variant.qty + (movementMap.get(variant.id) ?? 0),
+      })),
+    }));
+  }
+
   @Get()
-  list(
+  async list(
     @Query('deleted') deleted?: string,
     @Query('keyword') keyword?: string,
     @Query('start') start?: string,
@@ -67,19 +106,28 @@ export class ProductsController {
         ...(endDate ? { lte: endDate } : null),
       };
     }
-    return this.prisma.product.findMany({
+    const products = await this.prisma.product.findMany({
       where,
       include: { variants: true },
       orderBy: deletedOnly ? { deletedAt: 'desc' } : { createdAt: 'desc' },
     });
+
+    return this.withCurrentQty(products);
   }
 
   @Get(':id')
-  get(@Param('id') id: string) {
-    return this.prisma.product.findUnique({
+  async get(@Param('id') id: string) {
+    const product = await this.prisma.product.findUnique({
       where: { id },
       include: { variants: true },
     });
+
+    if (!product) {
+      return null;
+    }
+
+    const [result] = await this.withCurrentQty([product]);
+    return result;
   }
 
   @Post()

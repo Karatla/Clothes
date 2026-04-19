@@ -38,6 +38,7 @@ export class StockController {
   async getSummary(
     @Query('categoryId') categoryId?: string,
     @Query('keyword') keyword?: string,
+    @Query('stockStatus') stockStatus?: string,
   ) {
     const trimmedKeyword = keyword?.trim();
     const hasKeyword = Boolean(trimmedKeyword);
@@ -56,7 +57,7 @@ export class StockController {
       this.prisma.product.findMany({
         where,
         include: { variants: true, category: true },
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ name: 'asc' }, { createdAt: 'desc' }],
       }),
       this.prisma.stockMovement.findMany(),
     ]);
@@ -95,7 +96,17 @@ export class StockController {
       };
     });
 
-    const totals = summary.reduce(
+    const filteredSummary = summary.filter((product) => {
+      if (stockStatus === 'sold-out') {
+        return product.totalQty <= 0;
+      }
+      if (stockStatus === 'in-stock') {
+        return product.totalQty > 0;
+      }
+      return true;
+    });
+
+    const totals = filteredSummary.reduce(
       (acc, product) => {
         acc.totalQty += product.totalQty;
         acc.totalCost += product.totalCost;
@@ -112,7 +123,7 @@ export class StockController {
       { totalQty: 0, totalCost: 0, productCount: 0, variantCount: 0 },
     );
 
-    const categoryTotals = summary.reduce((acc, product) => {
+    const categoryTotals = filteredSummary.reduce((acc, product) => {
       const categoryId = product.categoryId ?? 'uncategorized';
       const categoryName = product.category?.name ?? '未分类';
       if (!acc[categoryId]) {
@@ -147,10 +158,10 @@ export class StockController {
     }>);
 
     return {
-      products: summary,
+      products: filteredSummary,
       totals,
-      categories: Object.values(categoryTotals).sort(
-        (a, b) => b.totalQty - a.totalQty,
+      categories: Object.values(categoryTotals).sort((a, b) =>
+        a.categoryName.localeCompare(b.categoryName, 'zh-CN'),
       ),
       updatedAt: new Date().toISOString(),
     };

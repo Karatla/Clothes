@@ -87,6 +87,13 @@ export default function ReturnsPage() {
   const [exchangeItems, setExchangeItems] = useState<ExchangeItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [presetSaleId, setPresetSaleId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    setPresetSaleId(params.get("saleId"));
+  }, []);
 
   useEffect(() => {
     Promise.all([
@@ -101,14 +108,17 @@ export default function ReturnsPage() {
         setProducts(productData);
         setSizeOptions(sizeData);
         if (salesData.length > 0) {
-          setSaleId(salesData[0].id);
+          const matchedSale = presetSaleId
+            ? salesData.find((sale) => sale.id === presetSaleId)
+            : null;
+          setSaleId(matchedSale?.id ?? salesData[0].id);
         }
         if (productData.length > 0) {
           setExchangeItems([createExchangeItem(productData[0].id)]);
         }
       })
       .catch(() => null);
-  }, []);
+  }, [presetSaleId]);
 
   const selectedSale = sales.find((sale) => sale.id === saleId);
 
