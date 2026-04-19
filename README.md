@@ -109,3 +109,211 @@ CTRT+C退出终端
 - `npx prisma migrate deploy`：把新版本数据库结构更新到本地已有数据库，不会像重置数据库那样清空原有数据
 - `npx prisma generate`：根据最新数据库结构重新生成 Prisma 客户端
 - 这两个命令都需要在 `apps/api` 目录中执行
+
+## Release 版本运行步骤
+
+发给客户后的 Release 版本，请按下面步骤运行：
+
+1. 先备份数据库文件：
+   ```bash
+   cp apps/api/prisma/dev.db apps/api/prisma/dev.db.backup
+   ```
+2. 进入 `apps/api` 目录
+3. 执行数据库迁移：
+   ```bash
+   npx prisma migrate deploy
+   ```
+4. 重新生成 Prisma 客户端：
+   ```bash
+   npx prisma generate
+   ```
+5. 编译后端：
+   ```bash
+   npm run build
+   ```
+6. 进入 `apps/web` 目录并编译前端：
+   ```bash
+   npm run build
+   ```
+7. 启动后端：
+   ```bash
+   cd ../api
+   node dist/src/main.js
+   ```
+8. 启动前端：
+   ```bash
+   cd ../web
+   npm run start
+   ```
+
+注意：
+- 如果是第一次部署，先在项目根目录执行 `npm install`
+- 不要执行 `npx prisma migrate reset`
+- 不要执行 `npx prisma db push --force-reset`
+- 上面两个命令可能会清空数据库数据
+
+## 脚本使用说明
+
+为了方便客户更新和启动程序，项目根目录提供了 6 个脚本文件，分别用于更新程序、启动后端、启动前端。
+
+### 一、更新脚本
+
+#### 1. `release-update.bat`
+适用于 Windows 用户。
+
+作用：
+- 自动备份数据库文件 `apps/api/prisma/dev.db`
+- 自动执行数据库迁移
+- 自动重新生成 Prisma Client
+- 自动编译后端
+- 自动编译前端
+
+使用方法：
+- 直接双击运行
+- 或在命令行中执行：
+  ```bat
+  release-update.bat
+  ```
+
+说明：
+- 脚本执行完成后不会自动关闭，会停留在窗口中，方便查看结果
+- 如果更新失败，也会停留在错误界面，方便排查问题
+
+#### 2. `release-update.sh`
+适用于 macOS / Linux 用户。
+
+作用：
+- 自动备份数据库文件 `apps/api/prisma/dev.db`
+- 自动执行数据库迁移
+- 自动重新生成 Prisma Client
+- 自动编译后端
+- 自动编译前端
+
+使用方法：
+```bash
+./release-update.sh
+```
+
+如果第一次无法运行，可先执行：
+```bash
+chmod +x release-update.sh
+```
+
+### 二、启动后端脚本
+
+#### 3. `start-api.bat`
+适用于 Windows 用户。
+
+作用：
+- 进入 `apps/api`
+- 启动后端正式版服务
+
+使用方法：
+- 直接双击运行
+- 或在命令行中执行：
+  ```bat
+  start-api.bat
+  ```
+
+说明：
+- 运行后窗口会一直保持打开状态，这是正常现象
+- 关闭该窗口，后端服务就会停止
+
+#### 4. `start-api.sh`
+适用于 macOS / Linux 用户。
+
+作用：
+- 进入 `apps/api`
+- 启动后端正式版服务
+
+使用方法：
+```bash
+./start-api.sh
+```
+
+如果第一次无法运行，可先执行：
+```bash
+chmod +x start-api.sh
+```
+
+### 三、启动前端脚本
+
+#### 5. `start-web.bat`
+适用于 Windows 用户。
+
+作用：
+- 进入 `apps/web`
+- 启动前端正式版服务
+
+使用方法：
+- 直接双击运行
+- 或在命令行中执行：
+  ```bat
+  start-web.bat
+  ```
+
+说明：
+- 运行后窗口会一直保持打开状态，这是正常现象
+- 关闭该窗口，前端服务就会停止
+
+#### 6. `start-web.sh`
+适用于 macOS / Linux 用户。
+
+作用：
+- 进入 `apps/web`
+- 启动前端正式版服务
+
+使用方法：
+```bash
+./start-web.sh
+```
+
+如果第一次无法运行，可先执行：
+```bash
+chmod +x start-web.sh
+```
+
+### 四、推荐使用顺序
+
+每次收到新版本更新后，建议按下面顺序操作：
+
+1. 先运行更新脚本
+Windows：
+```bat
+release-update.bat
+```
+
+macOS / Linux：
+```bash
+./release-update.sh
+```
+
+2. 更新完成后，启动后端
+Windows：
+```bat
+start-api.bat
+```
+
+macOS / Linux：
+```bash
+./start-api.sh
+```
+
+3. 再启动前端
+Windows：
+```bat
+start-web.bat
+```
+
+macOS / Linux：
+```bash
+./start-web.sh
+```
+
+### 五、注意事项
+
+- 更新程序前，脚本会自动备份数据库
+- 不要执行 `npx prisma migrate reset`
+- 不要执行 `npx prisma db push --force-reset`
+- 上面两个命令可能会清空数据库数据
+- 后端和前端启动后，窗口保持打开是正常现象，不要关闭
