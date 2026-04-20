@@ -1,10 +1,9 @@
 @echo off
+chcp 65001 >nul
 setlocal
 
 set "PROJECT_ROOT=%~dp0"
-if "%PROJECT_ROOT:~-1%"=="\" set "PROJECT_ROOT=%PROJECT_ROOT:~0,-1%"
-
-set "WEB_DIR=%PROJECT_ROOT%\apps\web"
+set "WEB_DIR=%PROJECT_ROOT%apps\web"
 
 echo 正在启动前端服务...
 cd /d "%WEB_DIR%"
