@@ -1,5 +1,4 @@
 @echo off
-chcp 65001 >nul
 setlocal
 
 set "PROJECT_ROOT=%~dp0"
@@ -8,57 +7,57 @@ set "WEB_DIR=%PROJECT_ROOT%apps\web"
 set "DB_FILE=%API_DIR%\prisma\dev.db"
 set "BACKUP_FILE=%API_DIR%\prisma\dev.db.backup"
 
-echo 开始执行 Release 更新...
+echo Starting release update...
 echo.
 
 if exist "%DB_FILE%" (
-  echo 正在备份数据库到: %BACKUP_FILE%
+  echo Backing up database to: %BACKUP_FILE%
   copy /Y "%DB_FILE%" "%BACKUP_FILE%" >nul
 ) else (
-  echo 未找到数据库文件，跳过备份
+  echo Database file not found, skipping backup
 )
 
 echo.
-echo 进入 API 目录: %API_DIR%
+echo Entering API directory: %API_DIR%
 cd /d "%API_DIR%"
 if errorlevel 1 goto :error
 
 echo.
-echo 执行 Prisma 数据库迁移...
+echo Running Prisma migrate deploy...
 call npx prisma migrate deploy
 if errorlevel 1 goto :error
 
 echo.
-echo 重新生成 Prisma Client...
+echo Generating Prisma Client...
 call npx prisma generate
 if errorlevel 1 goto :error
 
 echo.
-echo 编译 API...
+echo Building API...
 call npm run build
 if errorlevel 1 goto :error
 
 echo.
-echo 进入 Web 目录: %WEB_DIR%
+echo Entering Web directory: %WEB_DIR%
 cd /d "%WEB_DIR%"
 if errorlevel 1 goto :error
 
 echo.
-echo 编译 Web...
+echo Building Web...
 call npm run build
 if errorlevel 1 goto :error
 
 echo.
-echo Release 更新完成。
+echo Release update completed.
 echo.
-echo 启动方式：
-echo 1. 后端: cd apps\api ^&^& node dist\src\main.js
-echo 2. 前端: cd apps\web ^&^& npm run start
+echo Start commands:
+echo 1. API: cd apps\api ^&^& node dist\src\main.js
+echo 2. Web: cd apps\web ^&^& npm run start
 pause
 goto :eof
 
 :error
 echo.
-echo 更新失败，请检查上面的报错信息。
+echo Update failed. Check the error output above.
 pause
 exit /b 1
