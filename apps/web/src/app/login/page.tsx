@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-
-const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+import { getApiBase } from "@/lib/api";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -18,7 +17,8 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch(`${apiBase}/auth/login`, {
+      // 必须在点击时才解析地址：手机用局域网 IP 访问时要跟随当前主机名
+      const response = await fetch(`${getApiBase()}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
