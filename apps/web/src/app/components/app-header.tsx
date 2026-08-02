@@ -80,6 +80,12 @@ export default function AppHeader({ label, title, description }: Props) {
           >
             库存流水
           </a>
+          <a
+            href="/settings"
+            className="rounded-full border border-[#eadfce] bg-[#fbf7f0] px-3 py-1"
+          >
+            系统设置
+          </a>
         </nav>
         <LogoutButton />
       </div>

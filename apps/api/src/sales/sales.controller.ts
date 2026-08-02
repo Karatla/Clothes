@@ -20,8 +20,12 @@ type SaleItemInput = {
 type SaleInput = {
   soldAt?: string;
   note?: string | null;
+  paymentMethod?: string | null;
+  receivedAmount?: number | null;
   items?: SaleItemInput[];
 };
+
+const PAYMENT_METHODS = ['现金', '微信', '支付宝', '银行卡', '其他'];
 
 type SaleSearchType = 'default' | 'productCode' | 'saleNo' | 'saleId';
 
@@ -149,8 +153,12 @@ export class SalesController {
       throw new BadRequestException('销售数量必须大于 0');
     }
 
-    if (normalizedItems.some((item) => item.unitPrice < 0)) {
-      throw new BadRequestException('单价不能小于 0');
+    // 售价必须大于 0：进货入库新建的规格默认售价为 0，
+    // 直接开单会算出 0 元销售额和错误的利润，这里从源头拦住。
+    if (normalizedItems.some((item) => item.unitPrice <= 0)) {
+      throw new BadRequestException(
+        '单价必须大于 0，请先在商品详情里设置售价',
+      );
     }
 
     const variantIds = normalizedItems.map((item) => item.variantId);
@@ -205,6 +213,25 @@ export class SalesController {
       0,
     );
 
+    const paymentMethod = body.paymentMethod?.trim() || null;
+    if (paymentMethod && !PAYMENT_METHODS.includes(paymentMethod)) {
+      throw new BadRequestException('收款方式不正确');
+    }
+
+    // 实收和找零：只在收银时填了实收才记录，历史订单保持空
+    const receivedAmount =
+      typeof body.receivedAmount === 'number' &&
+      Number.isFinite(body.receivedAmount)
+        ? body.receivedAmount
+        : null;
+    if (receivedAmount !== null && receivedAmount < totalAmount) {
+      throw new BadRequestException('实收金额不能少于应收金额');
+    }
+    const changeAmount =
+      receivedAmount === null
+        ? null
+        : Math.round((receivedAmount - totalAmount) * 100) / 100;
+
     return this.prisma.$transaction(async (tx) => {
       for (let attempt = 0; attempt < 5; attempt += 1) {
         const saleNo = await this.createSaleNo(tx, soldAt);
@@ -216,6 +243,9 @@ export class SalesController {
               soldAt,
               totalAmount,
               note: body.note ?? null,
+              paymentMethod,
+              receivedAmount,
+              changeAmount,
               items: {
                 create: preparedItems.map((item) => ({
                   variantId: item.variantId,

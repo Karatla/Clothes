@@ -8,6 +8,10 @@ import {
 } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { PurchaseService } from '../purchase/purchase.service';
+import { BarcodeService } from '../variants/barcode.service';
+import { SettingsService } from '../settings/settings.service';
+import { matchesKeyword } from '../common/keyword';
 
 type MovementInput = {
   variantId?: string;
@@ -22,17 +26,24 @@ type BatchInItem = {
   size?: string;
   qty?: number;
   unitCost?: number | null;
+  salePrice?: number | null;
 };
 
 type BatchInInput = {
   productId?: string;
   note?: string | null;
+  occurredAt?: string;
   items?: BatchInItem[];
 };
 
 @Controller('stock')
 export class StockController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly purchase: PurchaseService,
+    private readonly barcode: BarcodeService,
+    private readonly settings: SettingsService,
+  ) {}
 
   @Get('summary')
   async getSummary(
@@ -47,13 +58,7 @@ export class StockController {
     if (categoryId) {
       where.categoryId = categoryId;
     }
-    if (hasKeyword && trimmedKeyword) {
-      where.OR = [
-        { name: { contains: trimmedKeyword } },
-        { baseCode: { contains: trimmedKeyword } },
-      ];
-    }
-    const [products, movements] = await Promise.all([
+    const [allProducts, movements] = await Promise.all([
       this.prisma.product.findMany({
         where,
         include: { variants: true, category: true },
@@ -61,6 +66,12 @@ export class StockController {
       }),
       this.prisma.stockMovement.findMany(),
     ]);
+
+    // 关键词同时匹配商品名称 / 款号 / 标签
+    const products =
+      hasKeyword && trimmedKeyword
+        ? allProducts.filter((product) => matchesKeyword(product, trimmedKeyword))
+        : allProducts;
 
     const movementTotals = movements.reduce(
       (acc, movement) => {
@@ -281,15 +292,28 @@ export class StockController {
             size,
             qty: 0,
             unitCost: null as number | null,
+            salePrice: null as number | null,
           };
         }
         acc[key].qty += qty;
         if (typeof item.unitCost === 'number') {
           acc[key].unitCost = item.unitCost;
         }
+        if (typeof item.salePrice === 'number' && item.salePrice > 0) {
+          acc[key].salePrice = item.salePrice;
+        }
         return acc;
       },
-      {} as Record<string, { color: string; size: string; qty: number; unitCost: number | null }>,
+      {} as Record<
+        string,
+        {
+          color: string;
+          size: string;
+          qty: number;
+          unitCost: number | null;
+          salePrice: number | null;
+        }
+      >,
     );
 
     const normalizedItems = Object.values(aggregated);
@@ -298,8 +322,23 @@ export class StockController {
       throw new BadRequestException('请至少填写一个入库数量');
     }
 
+    const occurredAt = body.occurredAt ? new Date(body.occurredAt) : new Date();
+    if (Number.isNaN(occurredAt.getTime())) {
+      throw new BadRequestException('入库日期不正确');
+    }
+
+    const barcodePrefix = (await this.settings.get('barcode.prefix')).trim();
+
     return this.prisma.$transaction(async (tx) => {
       const results = [] as Array<{ variantId: string }>;
+      const order = await this.createPurchaseOrder(
+        tx,
+        productId,
+        body.note ?? null,
+        occurredAt,
+      );
+      let totalQty = 0;
+      let totalCost = 0;
 
       for (const item of normalizedItems) {
         const unitCost =
@@ -321,9 +360,17 @@ export class StockController {
               size: item.size,
               qty: 0,
               costPrice: unitCost ?? 0,
-              salePrice: 0,
+              salePrice: item.salePrice ?? 0,
               sku: `${product.baseCode}-${item.color}-${item.size}`,
             },
+          });
+          // 新规格立刻发条码，这样入库完就能打标签
+          await this.barcode.ensureBarcode(tx, variant.id, barcodePrefix);
+        } else if (item.salePrice !== null) {
+          // 入库时填了售价就同步更新，避免留下售价为 0 的规格
+          await tx.variant.update({
+            where: { id: variant.id },
+            data: { salePrice: item.salePrice },
           });
         }
 
@@ -348,6 +395,7 @@ export class StockController {
         await tx.stockMovement.create({
           data: {
             variantId: variant.id,
+            purchaseOrderId: order.id,
             type: 'IN',
             qty: item.qty,
             unitCost: unitCost,
@@ -355,10 +403,47 @@ export class StockController {
           },
         });
 
+        totalQty += item.qty;
+        totalCost += item.qty * effectiveUnitCost;
         results.push({ variantId: variant.id });
       }
 
-      return { ok: true, count: results.length };
+      await tx.purchaseOrder.update({
+        where: { id: order.id },
+        data: { totalQty, totalCost },
+      });
+
+      return {
+        ok: true,
+        count: results.length,
+        orderNo: order.orderNo,
+        purchaseOrderId: order.id,
+      };
     });
+  }
+
+  private async createPurchaseOrder(
+    tx: Prisma.TransactionClient,
+    productId: string,
+    note: string | null,
+    occurredAt: Date,
+  ) {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const orderNo = await this.purchase.createOrderNo(tx, occurredAt);
+
+      try {
+        return await tx.purchaseOrder.create({
+          data: { orderNo, productId, note, occurredAt },
+        });
+      } catch (error) {
+        if ((error as { code?: string })?.code === 'P2002') {
+          continue;
+        }
+
+        throw error;
+      }
+    }
+
+    throw new BadRequestException('进货单号生成失败，请重试');
   }
 }

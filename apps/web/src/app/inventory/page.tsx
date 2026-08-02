@@ -18,6 +18,7 @@ type ProductSummary = {
   name: string;
   baseCode: string;
   imageUrl?: string | null;
+  tags?: string[] | null;
   categoryId?: string | null;
   category?: { id: string; name: string } | null;
   totalQty: number;
@@ -97,6 +98,12 @@ export default function InventorySummaryPage() {
 
         <div className="flex flex-wrap justify-end gap-3">
           <a
+            href="/labels/print"
+            className="rounded-2xl bg-[#a7652d] px-4 py-2 text-sm font-semibold text-white"
+          >
+            打印商品标签
+          </a>
+          <a
             href="/inventory/sold-out"
             className="rounded-2xl border border-[#e4d7c5] px-4 py-2 text-sm text-[#6b645a]"
           >
@@ -132,8 +139,13 @@ export default function InventorySummaryPage() {
               <input
                 value={keywordInput}
                 onChange={(event) => setKeywordInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    setKeyword(keywordInput.trim());
+                  }
+                }}
                 className="w-full rounded-2xl border border-[#e4d7c5] px-4 py-3 text-base"
-                placeholder="商品名称 / 款号"
+                placeholder="商品名称 / 款号 / 标签"
               />
             </label>
             <div className="flex items-end gap-3">
@@ -248,6 +260,18 @@ export default function InventorySummaryPage() {
                       <p className="text-xs text-[#6b645a]">
                         编码 {product.baseCode}
                       </p>
+                      {product.tags?.length ? (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {product.tags.map((tag) => (
+                            <span
+                              key={tag}
+                              className="rounded-full bg-[#eadfce] px-2 py-0.5 text-[11px] text-[#6b645a]"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
                       <a
                         href={`/products/${product.id}`}
                         className="text-xs text-[#a7652d]"

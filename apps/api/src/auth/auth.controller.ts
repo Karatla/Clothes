@@ -61,10 +61,13 @@ export class AuthController {
     tokens: { accessToken: string; refreshToken: string },
   ) {
     const accessMaxAge = 10 * 60 * 60 * 1000;
+    // secure=true 的 Cookie 只能通过 https 下发，
+    // 局域网内用 http://192.168.x.x 访问时会导致「账号密码正确却登录不上」，
+    // 所以默认关闭，只有明确配置 COOKIE_SECURE=true（走 https）时才开启。
     const cookieOptions = {
       httpOnly: true,
       sameSite: 'lax' as const,
-      secure: process.env.NODE_ENV === 'production',
+      secure: process.env.COOKIE_SECURE === 'true',
       path: '/',
     };
 

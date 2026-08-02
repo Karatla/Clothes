@@ -11,6 +11,9 @@ import {
 } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { matchesKeyword } from '../common/keyword';
+import { BarcodeService } from '../variants/barcode.service';
+import { SettingsService } from '../settings/settings.service';
 
 type ProductInput = {
   name?: string;
@@ -30,7 +33,11 @@ type ProductInput = {
 
 @Controller('products')
 export class ProductsController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly barcode: BarcodeService,
+    private readonly settings: SettingsService,
+  ) {}
 
   private async withCurrentQty<T extends { variants: Array<{ id: string; qty: number }> }>(
     products: T[],
@@ -88,13 +95,6 @@ export class ProductsController {
           isDeleted: deletedOnly,
         };
 
-    if (where && hasKeyword && trimmedKeyword) {
-      where.OR = [
-        { name: { contains: trimmedKeyword } },
-        { baseCode: { contains: trimmedKeyword } },
-      ];
-    }
-
     if (where && deletedOnly && (start || end)) {
       const startDate = start ? new Date(start) : undefined;
       const endDate = end ? new Date(end) : undefined;
@@ -106,11 +106,17 @@ export class ProductsController {
         ...(endDate ? { lte: endDate } : null),
       };
     }
-    const products = await this.prisma.product.findMany({
+    const allProducts = await this.prisma.product.findMany({
       where,
       include: { variants: true },
       orderBy: deletedOnly ? { deletedAt: 'desc' } : { createdAt: 'desc' },
     });
+
+    // 关键词同时匹配商品名称 / 款号 / 标签
+    const products =
+      hasKeyword && trimmedKeyword
+        ? allProducts.filter((product) => matchesKeyword(product, trimmedKeyword))
+        : allProducts;
 
     return this.withCurrentQty(products);
   }
@@ -162,27 +168,41 @@ export class ProductsController {
       throw new BadRequestException('请至少填写一个尺码库存');
     }
 
-    return this.prisma.product.create({
-      data: {
-        name,
-        baseCode,
-        categoryId: body.categoryId ?? null,
-        tags: body.tags ?? [],
-        imageUrl: body.imageUrl ?? null,
-        isDeleted: false,
-        deletedAt: null,
-        variants: {
-          create: variants.map((variant) => ({
-            color: variant.color ?? '',
-            size: variant.size ?? '',
-            qty: variant.qty ?? 0,
-            costPrice: variant.costPrice ?? 0,
-            salePrice: variant.salePrice ?? 0,
-            sku: variant.sku ?? '',
-          })),
+    const barcodePrefix = (await this.settings.get('barcode.prefix')).trim();
+
+    return this.prisma.$transaction(async (tx) => {
+      const product = await tx.product.create({
+        data: {
+          name,
+          baseCode,
+          categoryId: body.categoryId ?? null,
+          tags: body.tags ?? [],
+          imageUrl: body.imageUrl ?? null,
+          isDeleted: false,
+          deletedAt: null,
+          variants: {
+            create: variants.map((variant) => ({
+              color: variant.color ?? '',
+              size: variant.size ?? '',
+              qty: variant.qty ?? 0,
+              costPrice: variant.costPrice ?? 0,
+              salePrice: variant.salePrice ?? 0,
+              sku: variant.sku ?? '',
+            })),
+          },
         },
-      },
-      include: { variants: true },
+        include: { variants: true },
+      });
+
+      // 每个规格立刻发条码，录完商品就能打标签
+      for (const variant of product.variants) {
+        await this.barcode.ensureBarcode(tx, variant.id, barcodePrefix);
+      }
+
+      return tx.product.findUnique({
+        where: { id: product.id },
+        include: { variants: true },
+      });
     });
   }
 

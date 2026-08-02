@@ -81,8 +81,32 @@ export default function SalesListPage() {
       sales.map((sale) => ({
         ...sale,
         soldAtLabel: new Date(sale.soldAt).toLocaleString("zh-CN"),
+        totalQty: sale.items.reduce((sum, item) => sum + item.qty, 0),
+        itemCount: sale.items.length,
       })),
     [sales],
+  );
+
+  const overall = useMemo(
+    () =>
+      formatted.reduce(
+        (acc, sale) => {
+          acc.orderCount += 1;
+          acc.totalQty += sale.totalQty;
+          acc.totalAmount += sale.totalAmount;
+          acc.totalCost += sale.totalCost;
+          acc.totalProfit += sale.totalProfit;
+          return acc;
+        },
+        {
+          orderCount: 0,
+          totalQty: 0,
+          totalAmount: 0,
+          totalCost: 0,
+          totalProfit: 0,
+        },
+      ),
+    [formatted],
   );
 
   const keywordPlaceholder =
@@ -201,6 +225,39 @@ export default function SalesListPage() {
           </div>
         </section>
 
+        <section className="grid gap-4 rounded-3xl bg-white/90 p-6 text-sm text-[#6b645a] shadow-[0_25px_90px_-60px_rgba(36,27,14,0.4)] md:grid-cols-5">
+          <div>
+            <p className="text-xs">订单数</p>
+            <p className="mt-1 text-xl font-semibold text-[#1f1811]">
+              {overall.orderCount}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs">总件数</p>
+            <p className="mt-1 text-xl font-semibold text-[#1f1811]">
+              {overall.totalQty}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs">总金额</p>
+            <p className="mt-1 text-xl font-semibold text-[#1f1811]">
+              ¥{overall.totalAmount.toFixed(2)}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs">总成本</p>
+            <p className="mt-1 text-xl font-semibold text-[#1f1811]">
+              ¥{overall.totalCost.toFixed(2)}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs">总盈利</p>
+            <p className="mt-1 text-xl font-semibold text-[#1f1811]">
+              ¥{overall.totalProfit.toFixed(2)}
+            </p>
+          </div>
+        </section>
+
         <section className="space-y-4">
           {formatted.length ? (
             formatted.map((sale) => (
@@ -221,6 +278,12 @@ export default function SalesListPage() {
                     ) : null}
                   </div>
                   <div className="grid gap-1 text-right text-sm text-[#6b645a]">
+                    <div>
+                      总件数 {sale.totalQty} 件
+                      <span className="ml-2 text-xs text-[#8a8073]">
+                        （{sale.itemCount} 款）
+                      </span>
+                    </div>
                     <div>总金额 ¥{sale.totalAmount.toFixed(2)}</div>
                     <div>销售成本 ¥{sale.totalCost.toFixed(2)}</div>
                     <div className="font-semibold text-[#1f1811]">
@@ -228,6 +291,12 @@ export default function SalesListPage() {
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
+                    <a
+                      href={`/sales/${sale.id}/receipt`}
+                      className="rounded-2xl border border-[#e4d7c5] px-4 py-2 text-sm text-[#6b645a]"
+                    >
+                      打印小票
+                    </a>
                     <a
                       href={`/returns/new?saleId=${sale.id}`}
                       className="rounded-2xl border border-[#d6d0ff] px-4 py-2 text-sm text-[#5a49b7]"
@@ -273,6 +342,14 @@ export default function SalesListPage() {
                       <div>¥{item.profit.toFixed(2)}</div>
                     </div>
                   ))}
+                  <div className="grid grid-cols-[1.4fr_1fr_0.8fr_1fr_1fr_1fr] border-t border-[#eadfce] bg-[#f5efe6] px-4 py-2 text-sm font-semibold text-[#1f1811]">
+                    <div>合计</div>
+                    <div>{sale.itemCount} 款</div>
+                    <div>{sale.totalQty}</div>
+                    <div>¥{sale.totalAmount.toFixed(2)}</div>
+                    <div>¥{sale.totalCost.toFixed(2)}</div>
+                    <div>¥{sale.totalProfit.toFixed(2)}</div>
+                  </div>
                 </div>
               </div>
             ))

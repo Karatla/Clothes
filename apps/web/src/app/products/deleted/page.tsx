@@ -71,7 +71,7 @@ export default function DeletedProductsPage() {
                 value={keywordInput}
                 onChange={(event) => setKeywordInput(event.target.value)}
                 className="w-full rounded-2xl border border-[#e4d7c5] px-4 py-3 text-base"
-                placeholder="商品名称 / 款号"
+                placeholder="商品名称 / 款号 / 标签"
               />
             </label>
             <label className="space-y-2 text-sm text-[#6b645a]">

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import AppHeader from "@/app/components/app-header";
 import CategoryManager from "@/app/components/category-manager";
 import SizeManager from "@/app/components/size-manager";
-import { API_BASE, apiFetch, resolveImageUrl, uploadFile } from "@/lib/api";
+import { apiFetch, resolveImageUrl, uploadFile } from "@/lib/api";
 import { makeId } from "@/lib/id";
 
 type Category = {
@@ -176,7 +176,7 @@ export default function ProductEntryPage() {
     setUploading(true);
     try {
       const { url } = await uploadFile(file);
-      setImageUrl(`${API_BASE}${url}`);
+      setImageUrl(url);
     } catch (uploadError) {
       setError(
         uploadError instanceof Error

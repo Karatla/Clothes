@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import AppHeader from "@/app/components/app-header";
 import SizeManager from "@/app/components/size-manager";
+import SearchableSelect from "@/app/components/searchable-select";
+import BarcodeScanner from "@/app/components/barcode-scanner";
 import { apiFetch } from "@/lib/api";
 import { makeId } from "@/lib/id";
 
@@ -22,6 +24,7 @@ type Sale = {
   id: string;
   saleNo: string;
   soldAt: string;
+  totalAmount: number;
   items: SaleItem[];
 };
 
@@ -41,6 +44,7 @@ type Product = {
   id: string;
   name: string;
   baseCode: string;
+  tags?: string[] | null;
   variants: Array<{ id: string; color: string; size: string }>;
 };
 
@@ -88,6 +92,10 @@ export default function ReturnsPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [presetSaleId, setPresetSaleId] = useState<string | null>(null);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scanMessage, setScanMessage] = useState<string | null>(null);
+  const [saleStart, setSaleStart] = useState("");
+  const [saleEnd, setSaleEnd] = useState("");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -121,6 +129,54 @@ export default function ReturnsPage() {
   }, [presetSaleId]);
 
   const selectedSale = sales.find((sale) => sale.id === saleId);
+
+  /** 扫小票上的二维码定位订单，扫出来的是订单号 */
+  const handleScanReceipt = (code: string) => {
+    const value = code.trim();
+    const matched = sales.find(
+      (sale) => sale.saleNo === value || sale.id === value,
+    );
+    if (!matched) {
+      setScanMessage(`没有找到订单 ${value}`);
+      return;
+    }
+    setSaleId(matched.id);
+    setScanMessage(`已定位订单 ${matched.saleNo}`);
+    setScannerOpen(false);
+  };
+
+  const saleOptions = useMemo(() => {
+    const startTime = saleStart ? new Date(`${saleStart}T00:00:00`).getTime() : null;
+    const endTime = saleEnd ? new Date(`${saleEnd}T23:59:59.999`).getTime() : null;
+
+    return sales
+      .filter((sale) => {
+        const time = new Date(sale.soldAt).getTime();
+        if (startTime !== null && time < startTime) return false;
+        if (endTime !== null && time > endTime) return false;
+        return true;
+      })
+      .map((sale) => ({
+        value: sale.id,
+        label: sale.saleNo,
+        description: `${new Date(sale.soldAt).toLocaleString("zh-CN")} · ¥${
+          sale.totalAmount?.toFixed(2) ?? "0.00"
+        }`,
+        keywords: sale.items
+          .map((item) => item.variant?.product?.baseCode ?? "")
+          .join(" "),
+      }));
+  }, [sales, saleStart, saleEnd]);
+
+  const productOptions = useMemo(
+    () =>
+      products.map((product) => ({
+        value: product.id,
+        label: `${product.name} (${product.baseCode})`,
+        keywords: (product.tags ?? []).join(" "),
+      })),
+    [products],
+  );
 
   const remainingMap = useMemo(() => {
     const totals: Record<string, number> = {};
@@ -238,6 +294,13 @@ export default function ReturnsPage() {
 
   return (
     <div className="min-h-screen px-6 py-12">
+      <BarcodeScanner
+        open={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onScan={handleScanReceipt}
+        continuous={false}
+        title="扫小票二维码"
+      />
       <SizeManager
         open={showSizeManager}
         onClose={() => setShowSizeManager(false)}
@@ -254,20 +317,51 @@ export default function ReturnsPage() {
 
         <section className="rounded-3xl bg-white/90 p-8 shadow-[0_25px_90px_-60px_rgba(36,27,14,0.4)]">
           <div className="grid gap-4 md:grid-cols-2">
-            <label className="space-y-2 text-sm text-[#6b645a]">
-              销售记录
-              <select
-                value={saleId ?? ""}
-                onChange={(event) => setSaleId(event.target.value)}
-                className="w-full rounded-2xl border border-[#e4d7c5] px-4 py-3 text-base"
-              >
-                {sales.map((sale) => (
-                  <option key={sale.id} value={sale.id}>
-                    {sale.saleNo}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="space-y-2 text-sm text-[#6b645a]">
+              <div className="flex items-center justify-between">
+                <span>销售记录</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setScanMessage(null);
+                    setScannerOpen(true);
+                  }}
+                  className="rounded-full bg-[#a7652d] px-3 py-1 text-xs font-semibold text-white"
+                >
+                  扫小票
+                </button>
+              </div>
+              <SearchableSelect
+                value={saleId}
+                onChange={setSaleId}
+                options={saleOptions}
+                placeholder="请选择销售订单"
+                searchPlaceholder="按订单号 / 款号搜索"
+                emptyText="没有匹配的订单"
+                filters={
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="text-xs text-[#8a8073]">
+                      开始日期
+                      <input
+                        type="date"
+                        value={saleStart}
+                        onChange={(event) => setSaleStart(event.target.value)}
+                        className="mt-1 w-full rounded-xl border border-[#e4d7c5] px-2 py-1 text-sm"
+                      />
+                    </label>
+                    <label className="text-xs text-[#8a8073]">
+                      结束日期
+                      <input
+                        type="date"
+                        value={saleEnd}
+                        onChange={(event) => setSaleEnd(event.target.value)}
+                        className="mt-1 w-full rounded-xl border border-[#e4d7c5] px-2 py-1 text-sm"
+                      />
+                    </label>
+                  </div>
+                }
+              />
+            </div>
             <label className="space-y-2 text-sm text-[#6b645a]">
               退货日期
               <input
@@ -278,6 +372,12 @@ export default function ReturnsPage() {
               />
             </label>
           </div>
+
+          {scanMessage ? (
+            <div className="mt-4 rounded-2xl border border-[#eadfce] bg-[#fbf7f0] px-4 py-2 text-sm text-[#6b645a]">
+              {scanMessage}
+            </div>
+          ) : null}
 
           <div className="mt-6 space-y-4">
             <p className="text-sm font-semibold text-[#1f1811]">退货明细</p>
@@ -365,23 +465,20 @@ export default function ReturnsPage() {
                   key={item.id}
                   className="grid gap-3 rounded-2xl border border-[#eadfce] bg-white px-4 py-3 md:grid-cols-6"
                 >
-                  <select
+                  <SearchableSelect
                     value={item.productId}
-                    onChange={(event) =>
+                    onChange={(value) =>
                       updateExchangeItem(item.id, {
-                        productId: event.target.value,
+                        productId: value,
                         color: "",
                         size: "",
                       })
                     }
-                    className="rounded-xl border border-[#e4d7c5] px-3 py-2 text-sm"
-                  >
-                    {products.map((productItem) => (
-                      <option key={productItem.id} value={productItem.id}>
-                        {productItem.name} ({productItem.baseCode})
-                      </option>
-                    ))}
-                  </select>
+                    options={productOptions}
+                    placeholder="请选择商品"
+                    searchPlaceholder="按名称 / 款号 / 标签搜索"
+                    emptyText="没有匹配的商品"
+                  />
                   <select
                     value={item.color}
                     onChange={(event) =>

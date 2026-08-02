@@ -6,7 +6,7 @@ import { apiFetch } from "@/lib/api";
 
 type Movement = {
   id: string;
-  type: "IN" | "OUT" | "RETURN" | "ADJUST";
+  type: "IN" | "OUT" | "RETURN" | "ADJUST" | "PURCHASE_RETURN";
   qty: number;
   unitCost: number | null;
   note: string | null;
@@ -20,6 +20,7 @@ const typeLabels: Record<Movement["type"], string> = {
   OUT: "出库",
   RETURN: "退货",
   ADJUST: "调整",
+  PURCHASE_RETURN: "进货退货",
 };
 
 export default function MovementsPage() {
