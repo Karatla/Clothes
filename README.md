@@ -1,319 +1,242 @@
-# Clothes
+# Clothes 服装库存管理系统
 
-1) Open terminal and go to project root  
-cd /path/to/Clothes
-2) Install dependencies (root workspace)  
-npm install
-3) Create env files  
-cd apps/api
-cp .env.example .env
-cd ../web
-cp .env.example .env.local
-4) Build (production)  
-cd ../api
-npm run build
-cd ../web
-npm run build
-5) Run API  
-cd ../api
-npm run start:prod/node dist/src/main.js
-6) Run Web  
-cd ../web
-npm run start
+## ⚠️ 最重要的三条
 
-## Startup Checks
+1. **`git pull` 之前，先双击 `backup.bat`**（备份数据库和商品图片）。
+2. **数据库文件 `apps/api/prisma/dev.db` 不在 git 仓库里**，只存在于每台电脑本地。换电脑要手动拷贝。
+3. **永远不要执行** `npx prisma migrate reset` 和 `npx prisma db push --force-reset`，这两个命令会清空所有数据。
 
-### Web (Next.js)
-From repo root:
-- `cd apps/web`
-- `npm run dev`
-npm run start(for product)
+---
 
-Open http://localhost:3000 — you should see the default Next.js page.
+## 一、全新电脑首次部署
 
-### API (NestJS)
-From repo root:
-- `cd apps/api`
-- `npm run start:dev`
-npm run start:prod(for product)
+### 1. 准备环境（只做一次）
 
-Default endpoint: http://localhost:3000/
-If you change the port later, update this section.
-
-### Node Version
-Use Node 20.19.0 for best compatibility:
-- `nvm use`
-
-if mention : error TS2305: Module '"@prisma/client"' has no exported member 'StockMovementType'.
-2 import { PrismaClient, StockMovementType } from '@prisma/client';
-npx prisma generate
-
-
-
-1、把Clothes-main和node-v20.20.0-win-x64解压在同一目录下
-2、环境变量：我的电脑——属性——高级系统设置——环境变量——编辑（path）_新建node-v20.20.0-win-x64（解压后的路径）
-3、输入npm -v   测试（改变环境变量之后要打开新的终端）成功了显示版本号
-4、测试成功，改变镜像 npm config set registry https://registry.npmmirror.com
-5、测试镜像是否成功  npm config get registry ，如果成功，会显示4的网址
-第一阶段搭建环境成功。
-
-
-第二阶段编译工程文件（有更新后执行第3——6布）
-0, npm install
-1、把.env文件复制到apps\api   下面
-2、把.env,local文件复制到web里面
-3、进入到api文件夹，运行 npx prisma generate，成功后
-4、运行     npm run build     进行编译库 （必须在api目录里很重要）
-5、进入到 web目录 npm run build   进行编译库 （必须在web目录里很重要）
-6, 如果数据库更新了执行这一步：npx prisma migrate deploy
-
-
-初始化数据库文件：（删除该文件）   apps/api/prisma/dev.db
-
-刷新数据库：在该文件目录里执行该命令：    npx prisma migrate dev
-删除数据文件：Clothes-main\apps\api\data\所有文件
-                         \Clothes-main\apps\api\uploads\所有图片
-
-
-
-第3阶段（每次启动电脑都要运行）
-1、执行    node dist/src/main.js   （一定是在api文件下运行）启动服务器
-2、测试服务器是否成功  http://localhost:3001/health    显示OK，表示成功（打开浏览器）
-3、运行网页端：  npm run start  (前端服务器启动）必须在WeB目录下
-4、CTRT+鼠标左键，启动网页端
-CTRT+C退出终端
-
-## 新程序的更新步骤
-
-当收到新程序更新后，请按下面步骤操作：
-
-1. 进入 `apps/api` 目录
-2. 执行数据库迁移：
-   ```bash
-   npx prisma migrate deploy
-   ```
-3. 重新生成 Prisma 客户端：
-   ```bash
-   npx prisma generate
-   ```
-4. 在 `apps/api` 目录执行编译：
-   ```bash
-   npm run build
-   ```
-5. 进入 `apps/web` 目录执行编译：
-   ```bash
-   npm run build
+1. 安装 **Node.js 20 LTS**（[nodejs.org](https://nodejs.org/)）。或解压绿色版 `node-v20.x-win-x64`，把解压路径加到系统环境变量 `Path` 里
+   （我的电脑 → 属性 → 高级系统设置 → 环境变量 → 编辑 Path → 新建）
+2. **打开一个新的命令行窗口**（改完环境变量必须重开），执行 `npm -v`，能显示版本号就说明成功
+3. 换成国内镜像，下载会快很多：
+   ```bat
+   npm config set registry https://registry.npmmirror.com
    ```
 
-说明：
-- `npx prisma migrate deploy`：把新版本数据库结构更新到本地已有数据库，不会像重置数据库那样清空原有数据
-- `npx prisma generate`：根据最新数据库结构重新生成 Prisma 客户端
-- 这两个命令都需要在 `apps/api` 目录中执行
+### 2. 一键安装
 
-## Release 版本运行步骤
+把项目文件夹放好，然后双击：
 
-发给客户后的 Release 版本，请按下面步骤运行：
-
-1. 先备份数据库文件：
-   ```bash
-   cp apps/api/prisma/dev.db apps/api/prisma/dev.db.backup
-   ```
-2. 进入 `apps/api` 目录
-3. 执行数据库迁移：
-   ```bash
-   npx prisma migrate deploy
-   ```
-4. 重新生成 Prisma 客户端：
-   ```bash
-   npx prisma generate
-   ```
-5. 编译后端：
-   ```bash
-   npm run build
-   ```
-6. 进入 `apps/web` 目录并编译前端：
-   ```bash
-   npm run build
-   ```
-7. 启动后端：
-   ```bash
-   cd ../api
-   node dist/src/main.js
-   ```
-8. 启动前端：
-   ```bash
-   cd ../web
-   npm run start
-   ```
-
-注意：
-- 如果是第一次部署，先在项目根目录执行 `npm install`
-- 不要执行 `npx prisma migrate reset`
-- 不要执行 `npx prisma db push --force-reset`
-- 上面两个命令可能会清空数据库数据
-
-## 脚本使用说明
-
-为了方便客户更新和启动程序，项目根目录提供了 6 个脚本文件，分别用于更新程序、启动后端、启动前端。
-
-### 一、更新脚本
-
-#### 1. `release-update.bat`
-适用于 Windows 用户。
-
-作用：
-- 自动备份数据库文件 `apps/api/prisma/dev.db`
-- 自动执行数据库迁移
-- 自动重新生成 Prisma Client
-- 自动编译后端
-- 自动编译前端
-
-使用方法：
-- 直接双击运行
-- 或在命令行中执行：
-  ```bat
-  release-update.bat
-  ```
-
-说明：
-- 脚本执行完成后不会自动关闭，会停留在窗口中，方便查看结果
-- 如果更新失败，也会停留在错误界面，方便排查问题
-
-#### 2. `release-update.sh`
-适用于 macOS / Linux 用户。
-
-作用：
-- 自动备份数据库文件 `apps/api/prisma/dev.db`
-- 自动执行数据库迁移
-- 自动重新生成 Prisma Client
-- 自动编译后端
-- 自动编译前端
-
-使用方法：
-```bash
-./release-update.sh
+```
+install.bat
 ```
 
-如果第一次无法运行，可先执行：
-```bash
-chmod +x release-update.sh
+脚本会自动完成：检查 Node 版本 → 安装依赖 → **生成配置文件并随机生成密钥**（会让你输入登录邮箱和密码）→ 创建数据库 → 回填历史数据 → 编译前后端 → 放行防火墙端口。
+
+> macOS / Linux 用 `./install.sh`
+
+### 3. 设置固定 IP（强烈建议）
+
+**右键 → 以管理员身份运行**：
+
+```
+set-static-ip.bat
 ```
 
-### 二、启动后端脚本
+不设的话，路由器随时可能给这台电脑换一个 IP，手机上的书签和以后的 HTTPS 证书都会失效。
 
-#### 3. `start-api.bat`
-适用于 Windows 用户。
+脚本会先列出网卡、显示当前配置，让你确认后才修改。想改回自动获取：`set-static-ip.bat revert`
 
-作用：
-- 进入 `apps/api`
-- 启动后端正式版服务
+### 4. 启动
 
-使用方法：
-- 直接双击运行
-- 或在命令行中执行：
-  ```bat
-  start-api.bat
-  ```
-
-说明：
-- 运行后窗口会一直保持打开状态，这是正常现象
-- 关闭该窗口，后端服务就会停止
-
-#### 4. `start-api.sh`
-适用于 macOS / Linux 用户。
-
-作用：
-- 进入 `apps/api`
-- 启动后端正式版服务
-
-使用方法：
-```bash
-./start-api.sh
+```
+start-api.bat     后端
+start-web.bat     前端
 ```
 
-如果第一次无法运行，可先执行：
-```bash
-chmod +x start-api.sh
+两个窗口都要保持打开，关掉就等于停止服务。
+
+浏览器访问：
+
+- 本机：`http://localhost:3000`
+- 手机 / 平板：`http://<这台电脑的IP>:3000`（安装脚本最后会告诉你这个地址）
+
+---
+
+## 二、日常更新（收到新版本后）
+
+**顺序很重要**：
+
+```
+1. backup.bat          先备份！
+2. git pull            拉取新版本
+3. release-update.bat  更新
+4. start-api.bat + start-web.bat   重新启动
 ```
 
-### 三、启动前端脚本
+`release-update.bat` 会自动：备份 → 安装新依赖 → 数据库迁移 → 重新生成 Prisma Client → 回填历史数据 → 编译前后端。
 
-#### 5. `start-web.bat`
-适用于 Windows 用户。
+> macOS / Linux 用 `./backup.sh` 和 `./release-update.sh`
 
-作用：
-- 进入 `apps/web`
-- 启动前端正式版服务
+---
 
-使用方法：
-- 直接双击运行
-- 或在命令行中执行：
-  ```bat
-  start-web.bat
-  ```
+## 三、脚本一览
 
-说明：
-- 运行后窗口会一直保持打开状态，这是正常现象
-- 关闭该窗口，前端服务就会停止
+| 脚本 | 作用 | 何时用 |
+|---|---|---|
+| `install.bat` / `.sh` | 全新电脑首次安装 | 只用一次 |
+| `backup.bat` / `.sh` | 备份数据库 + 商品图片到 `backups/` | **每次 git pull 之前** |
+| `release-update.bat` / `.sh` | 日常更新 | 每次收到新版本 |
+| `start-api.bat` / `.sh` | 启动后端 | 每次开机 |
+| `start-web.bat` / `.sh` | 启动前端 | 每次开机 |
+| `set-static-ip.bat` / `.sh` | 设置固定 IP（需管理员 / sudo） | 部署时一次 |
+| `open-firewall.bat` / `.sh` | 放行 3000/3001/3443/3444 端口（需管理员 / sudo） | 部署时一次，install 会自动调用 |
+| `create-cert.bat` / `.sh` | 生成 HTTPS 证书（手机扫码用） | 部署时、IP 变化后、每年一次 |
 
-#### 6. `start-web.sh`
-适用于 macOS / Linux 用户。
+每个脚本都有 `.bat`（Windows）和 `.sh`（macOS / Linux）两个版本，功能一致。
+其中系统类脚本用的是各平台自己的工具：
 
-作用：
-- 进入 `apps/web`
-- 启动前端正式版服务
+| 脚本 | Windows | macOS | Linux |
+|---|---|---|---|
+| `set-static-ip` | `netsh` | `networksetup` | `nmcli` |
+| `open-firewall` | `netsh advfirewall` | 应用防火墙（放行 node） | `ufw` 或 `firewalld` |
 
-使用方法：
-```bash
-./start-web.sh
+这两个会修改系统设置，**运行前会先显示当前配置并要求你输入 YES 确认**，也都支持 `revert` 改回去。
+
+备份保留最近 10 份，存放在 `backups/`，不会进入 git 仓库。
+
+---
+
+## 四、手机摄像头扫码（HTTPS 证书）
+
+手机浏览器规定**只有安全连接（https）才能打开摄像头**。店里是局域网、没有域名，所以要用这台电脑自己签发的证书，手机信任一次即可。
+
+### 电脑上（一次）
+
+```
+1. set-static-ip.bat     先把 IP 固定下来（管理员运行）
+2. create-cert.bat       生成证书
+3. 重启 start-api.bat 和 start-web.bat
 ```
 
-如果第一次无法运行，可先执行：
-```bash
-chmod +x start-web.sh
-```
+> macOS / Linux：`./set-static-ip.sh` → `./create-cert.sh` → 重启两个服务
 
-### 四、推荐使用顺序
+生成后会多出四个地址：
 
-每次收到新版本更新后，建议按下面顺序操作：
+| | http（日常用） | https（扫码用） |
+|---|---|---|
+| 前端 | `http://<ip>:3000` | `https://<ip>:3443` |
+| 后端 | `http://<ip>:3001` | `https://<ip>:3444` |
 
-1. 先运行更新脚本
-Windows：
+**http 不能关**：手机在信任证书之前只能通过 http 下载证书。
+
+### 手机上（每台一次）
+
+浏览器打开 `http://<电脑IP>:3000/setup/certificate`，页面会自动识别 iPhone 还是 Android 并给出对应步骤，点按钮下载证书后按提示安装。
+
+⚠️ **iPhone 最容易漏的一步**：装完描述文件后，还要去
+**设置 → 通用 → 关于本机 → 最底部「证书信任设置」**，把 `Clothes Local CA` 的开关打开，否则不生效。
+
+装好后点页面上的「打开安全版本」，以后手机就用 `https://<ip>:3443` 这个地址。
+
+### 什么时候要重新生成证书
+
+| 情况 | 要做什么 | 手机要重装吗 |
+|---|---|---|
+| 电脑 IP 变了 | 重新运行 `create-cert.bat` | **不用** |
+| 证书到期（约一年） | 重新运行 `create-cert.bat` | **不用** |
+| 换了新电脑 | 运行 `create-cert.bat` | 要重装 |
+
+根证书有效期 10 年且每次生成都会复用，所以只要不换电脑，手机就永远不用再装第二次。
+
+## 五、扫码与打印
+
+### 商品贴码
+
+每个「商品 + 颜色 + 尺码」有一个唯一的二维码编号（如 `10000001`），**同款同色同码共用一个码**。
+录商品、进货入库时自动发码，历史商品由更新脚本自动补发。
+
+打印标签的三个入口：
+- 进货入库保存成功后 →「打印本次入库标签」（进货当场贴，最方便）
+- 商品详情页 →「打印标签」
+- 库存总览 →「打印商品标签」
+
+标签尺寸默认 40×30mm，在系统设置里可改成 50×30 / 60×40 / A4 不干胶。
+
+### 扫码开单
+
+销售开单页顶部有两种扫码方式：
+- **摄像头扫码**：点「扫码开单」，需要先装好证书（见第四节）
+- **扫码枪**：直接扫旁边那个输入框即可，扫码枪等于键盘，不需要装证书
+
+扫到已在单子里的商品会自动数量 +1，新商品自动带出售价。
+
+### 小票打印
+
+销售保存后点「打印小票」，或在销售记录里每单都有打印入口。
+纸张默认 80mm 热敏纸，系统设置里可改 58mm 或 A4。
+小票底部会印订单二维码，**退换货时在退换货页点「扫小票」扫一下即可直接定位订单**。
+
+## 六、手机 / 平板访问
+
+1. 手机和电脑必须连**同一个 Wi-Fi**
+2. 浏览器打开 `http://<电脑IP>:3000`
+3. 打不开时按顺序排查：
+   - 电脑上 `http://localhost:3000` 能不能打开（不能 → 前端没启动）
+   - 手机上 `http://<电脑IP>:3001` 有没有反应（完全连不上 → 防火墙，用管理员运行 `open-firewall.bat`）
+   - 电脑 IP 是不是变了（用 `ipconfig` 查，或运行 `set-static-ip.bat` 固定下来）
+
+前端会自动把后端地址跟随当前访问的地址，**不需要**为手机单独改配置文件。
+
+---
+
+## 七、数据与备份
+
+| 内容 | 位置 | 进 git 吗 |
+|---|---|---|
+| 数据库 | `apps/api/prisma/dev.db` | ❌ 不进 |
+| 商品图片 | `apps/api/uploads/` | ❌ 不进 |
+| 配置（含密码、密钥） | `apps/api/.env`、`apps/web/.env.local` | ❌ 不进 |
+| 备份 | `backups/<时间戳>/` | ❌ 不进 |
+
+**换电脑搬数据**：在旧电脑跑一次 `backup.bat`，把 `backups/` 下最新那个文件夹拷到新电脑，新电脑跑完 `install.bat` 后，用备份里的 `dev.db` 覆盖 `apps/api/prisma/dev.db`，把 `uploads.zip` 解压到 `apps/api/uploads/`，再重启服务。
+
+---
+
+## 八、常见问题
+
+**编译时报 `Module '"@prisma/client"' has no exported member ...`**
+在 `apps/api` 目录执行 `npx prisma generate`。
+
+**后端启动报缺少 ADMIN_EMAIL / ADMIN_PASSWORD**
+`apps/api/.env` 没生成或被删了，重新跑 `install.bat` 会补上（已有的不会被覆盖）。
+
+**数据库连接报错**
+检查 `apps/api/.env` 里是 `DATABASE_URL="file:./dev.db"`，不能写成 `sqlite:./dev.db`。
+
+**手机上登录显示"Load failed"**
+后端 3001 端口没放行，用管理员运行 `open-firewall.bat`。
+
+**这次更新时 `git pull` 报 `dev.db` 冲突（只会出现一次）**
+这是因为本次更新把数据库文件移出了 git 仓库。**你本地的数据库是安全的**，按下面处理：
+
 ```bat
-release-update.bat
+backup.bat
+git rm --cached apps/api/prisma/dev.db
+git pull
 ```
 
-macOS / Linux：
+`git rm --cached` 只是让 git 不再跟踪这个文件，**不会删除本地文件**。
+处理完之后确认 `apps/api/prisma/dev.db` 还在、大小正常，就可以继续 `release-update.bat`。
+万一文件不见了，从 `backups/` 里最新那份 `dev.db` 拷回去即可。
+
+---
+
+## 九、开发者说明
+
 ```bash
-./release-update.sh
+npm install            # 根目录，workspace 一次装全
+cd apps/api && npm run start:dev     # 后端开发模式
+cd apps/web && npm run dev           # 前端开发模式
 ```
 
-2. 更新完成后，启动后端
-Windows：
-```bat
-start-api.bat
-```
-
-macOS / Linux：
-```bash
-./start-api.sh
-```
-
-3. 再启动前端
-Windows：
-```bat
-start-web.bat
-```
-
-macOS / Linux：
-```bash
-./start-web.sh
-```
-
-### 五、注意事项
-
-- 更新程序前，脚本会自动备份数据库
-- 不要执行 `npx prisma migrate reset`
-- 不要执行 `npx prisma db push --force-reset`
-- 上面两个命令可能会清空数据库数据
-- 后端和前端启动后，窗口保持打开是正常现象，不要关闭
+- Node 版本：见 `.nvmrc`，用 `nvm use`
+- 数据库迁移：改完 `schema.prisma` 后 `npx prisma migrate dev --name xxx`
+- 一次性数据脚本放在 `apps/api/scripts/`，必须写成**可重复执行**（幂等），因为更新脚本每次都会跑

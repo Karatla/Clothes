@@ -1,49 +1,59 @@
 @echo off
-setlocal
+setlocal enabledelayedexpansion
+chcp 65001 >nul
+
+rem ===========================================================
+rem  Day-to-day update. Run AFTER "git pull".
+rem  For a brand new computer use install.bat instead.
+rem
+rem  IMPORTANT: run backup.bat BEFORE "git pull", not after.
+rem ===========================================================
 
 set "PROJECT_ROOT=%~dp0"
 set "API_DIR=%PROJECT_ROOT%apps\api"
 set "WEB_DIR=%PROJECT_ROOT%apps\web"
-set "DB_FILE=%API_DIR%\prisma\dev.db"
-set "BACKUP_FILE=%API_DIR%\prisma\dev.db.backup"
 
 echo Starting release update...
 echo.
 
-if exist "%DB_FILE%" (
-  echo Backing up database to: %BACKUP_FILE%
-  copy /Y "%DB_FILE%" "%BACKUP_FILE%" >nul
-) else (
-  echo Database file not found, skipping backup
-)
-
-echo.
-echo Entering API directory: %API_DIR%
-cd /d "%API_DIR%"
+echo [1/6] Backing up database and product images...
+call "%PROJECT_ROOT%backup.bat" quiet
 if errorlevel 1 goto :error
 
 echo.
-echo Running Prisma migrate deploy...
+echo [2/6] Installing dependencies...
+cd /d "%PROJECT_ROOT%"
+call npm install
+if errorlevel 1 goto :error
+
+echo.
+echo [3/6] Running Prisma migrate deploy...
+cd /d "%API_DIR%"
+if errorlevel 1 goto :error
 call npx prisma migrate deploy
 if errorlevel 1 goto :error
 
 echo.
-echo Generating Prisma Client...
+echo [4/6] Generating Prisma Client...
 call npx prisma generate
 if errorlevel 1 goto :error
 
 echo.
-echo Building API...
+echo       Backfilling historical purchase orders (safe to re-run)...
+call npx ts-node -P tsconfig.json scripts/backfill-purchase-orders.ts
+if errorlevel 1 goto :error
+call npx ts-node -P tsconfig.json scripts/backfill-barcodes.ts
+if errorlevel 1 goto :error
+
+echo.
+echo [5/6] Building the backend...
 call npm run build
 if errorlevel 1 goto :error
 
 echo.
-echo Entering Web directory: %WEB_DIR%
+echo [6/6] Building the frontend...
 cd /d "%WEB_DIR%"
 if errorlevel 1 goto :error
-
-echo.
-echo Building Web...
 call npm run build
 if errorlevel 1 goto :error
 
@@ -51,13 +61,14 @@ echo.
 echo Release update completed.
 echo.
 echo Start commands:
-echo 1. API: cd apps\api ^&^& node dist\src\main.js
-echo 2. Web: cd apps\web ^&^& npm run start
+echo   1. API: start-api.bat
+echo   2. Web: start-web.bat
 pause
 goto :eof
 
 :error
 echo.
 echo Update failed. Check the error output above.
+echo Your data is safe - a backup was made in the backups folder.
 pause
 exit /b 1

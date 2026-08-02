@@ -1,43 +1,52 @@
 #!/bin/bash
+# Day-to-day update. Run AFTER "git pull".
+# For a brand new computer use install.sh instead.
+#
+# IMPORTANT: run backup.sh BEFORE "git pull", not after.
 
 set -e
 
 PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
 API_DIR="$PROJECT_ROOT/apps/api"
 WEB_DIR="$PROJECT_ROOT/apps/web"
-DB_FILE="$API_DIR/prisma/dev.db"
-BACKUP_FILE="$API_DIR/prisma/dev.db.backup.$(date +%Y%m%d_%H%M%S)"
 
-echo "开始执行 Release 更新..."
+echo "Starting release update..."
+echo ""
 
-if [ -f "$DB_FILE" ]; then
-  echo "备份数据库到: $BACKUP_FILE"
-  cp "$DB_FILE" "$BACKUP_FILE"
-else
-  echo "未找到数据库文件，跳过备份"
-fi
+echo "[1/6] Backing up database and product images..."
+bash "$PROJECT_ROOT/backup.sh"
 
-echo "进入 API 目录: $API_DIR"
+echo ""
+echo "[2/6] Installing dependencies..."
+cd "$PROJECT_ROOT"
+npm install
+
+echo ""
+echo "[3/6] Running Prisma migrate deploy..."
 cd "$API_DIR"
-
-echo "执行 Prisma 数据库迁移..."
 npx prisma migrate deploy
 
-echo "重新生成 Prisma Client..."
+echo ""
+echo "[4/6] Generating Prisma Client..."
 npx prisma generate
 
-echo "编译 API..."
+echo ""
+echo "      Backfilling historical purchase orders (safe to re-run)..."
+npx ts-node -P tsconfig.json scripts/backfill-purchase-orders.ts
+npx ts-node -P tsconfig.json scripts/backfill-barcodes.ts
+
+echo ""
+echo "[5/6] Building the backend..."
 npm run build
 
-echo "进入 Web 目录: $WEB_DIR"
+echo ""
+echo "[6/6] Building the frontend..."
 cd "$WEB_DIR"
-
-echo "编译 Web..."
 npm run build
 
 echo ""
-echo "Release 更新完成。"
+echo "Release update completed."
 echo ""
-echo "启动方式："
-echo "1. 后端: cd apps/api && node dist/src/main.js"
-echo "2. 前端: cd apps/web && npm run start"
+echo "Start commands:"
+echo "  1. Backend: ./start-api.sh"
+echo "  2. Frontend: ./start-web.sh"
