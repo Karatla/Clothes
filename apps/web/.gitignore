@@ -32,6 +32,8 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# 模板文件必须进仓库，否则新电脑克隆下来没有配置样例
+!.env.example
 
 # vercel
 .vercel

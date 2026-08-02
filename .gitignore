@@ -4,6 +4,7 @@ node_modules
 .DS_Store
 .env
 .env.*
+!.env.example
 
 # Next.js
 apps/web/.next
@@ -15,7 +16,23 @@ apps/api/dist
 apps/api/node_modules
 /uploads
 /data
+
+# 数据库：绝对不要提交，否则 git pull 会覆盖生产数据
 apps/api/dev.db*
+apps/api/prisma/*.db
+apps/api/prisma/*.db-journal
+apps/api/prisma/*.db-wal
+apps/api/prisma/*.db-shm
+apps/api/prisma/dev.db.backup*
+
+# 商品图片
+apps/api/uploads/
+
+# 备份（数据库 + 图片）
+/backups/
+
+# HTTPS 证书，每台电脑本地生成，不进仓库
+/certs/
 
 # Logs
 npm-debug.log*

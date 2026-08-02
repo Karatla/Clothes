@@ -1,2 +1,9 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Windows batch files MUST use CRLF, otherwise goto / if blocks can break
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Shell scripts MUST use LF, otherwise bash fails with "\r: command not found"
+*.sh text eol=lf
